@@ -35,15 +35,12 @@ data Proc pa v a where
   Monadify :: pa x y -> v x -> Proc pa v y
 
 
-{-}
-getIt :: l -> TupIndex l a -> a
-getIt x     Here        = x
-getIt x (GoLeft  l) = getIt (fst x) l
-getIt x (GoRight r) = getIt (snd x) r
--}
 
-extendA :: Arrow a => pa (HList l) a -> pa (HList l) (HList (a ': l))
+extendA :: Arrow pa => pa (HList l) a -> pa (HList l) (HList (a ': l))
 extendA a = (a &&& arr id) >>> arr (uncurry HCons)
+
+runProc :: Arrow pa => (forall v. v x -> Proc pa v y) -> pa x y
+runProc f = undefined
 
 go :: Arrow pa => HFMap s (HIndex l) -> Proc pa (Key s) a -> KeyM s (pa (HList l) a)
 go e (RRet k) = pure $ arr (\l -> index l (e ! k))
@@ -51,38 +48,7 @@ go e (RBind m f) = do l <- go e m
                       k <- newKey
                       let e' = insert k HHead (hfmapmap HTail e)
                       r <- go e' (f k)
-                      pure $ l >>> r
-
-{-
-
-data HList l where
-  Nil :: HList '[]
-  Cons :: h -> HList t -> HList (h ': t)
-
-
-
-newtype V l y = V (HList l -> y)
-newtype Arr arr l y = Arr { getArr :: arr (HList l) y }
-
-rreturn :: Arrow arr => V l x -> Arr arr l x
-rreturn (V v) = Arr (arr v)
-
-weaken :: V t x -> V (h ': t) x
-weaken (V v) = V (\(Cons _ t) -> v t)
-
-var :: V (x ': l) x
-var = V (\(Cons h _) -> h)
-
-bind :: Arrow arr => Arr arr l x -> (V (x ': l) x -> Arr arr (x ': l) y) -> Arr arr l y
-bind (Arr m) f = Arr (m (getArr (f  var)))
-
-
+                      pure $ extendA l >>> r
+go e (Monadify a k) = pure $ arr (\l -> index l (e ! k)) >>> a
 
 main = undefined
--}
-
-main = undefined
-{-
-newtype Cage s x = Cage { liberate :: s -> x }
-     deriving (Functor,Applicative)
--}
