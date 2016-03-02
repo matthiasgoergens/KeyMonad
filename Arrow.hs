@@ -40,7 +40,9 @@ extendA :: Arrow pa => pa (HList l) a -> pa (HList l) (HList (a ': l))
 extendA a = (a &&& arr id) >>> arr (uncurry HCons)
 
 runProc :: Arrow pa => (forall v. v x -> Proc pa v y) -> pa x y
-runProc f = undefined
+runProc f = do k <- newKey
+               r <- go (singleton k HHead) (f k)
+               
 
 go :: Arrow pa => HFMap s (HIndex l) -> Proc pa (Key s) a -> KeyM s (pa (HList l) a)
 go e (RRet k) = pure $ arr (\l -> index l (e ! k))
