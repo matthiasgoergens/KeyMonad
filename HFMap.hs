@@ -1,5 +1,5 @@
 {-# LANGUAGE Rank2Types #-}
-module HFMap (HFMap, empty, insert,lookup,singleton, (!), hfmapmap) where
+module HFMap (HFMap, empty, insert,lookup,singleton, (!), pfmap) where
 
 import KeyM
 import Dynamic
@@ -26,5 +26,5 @@ lookup k (HFMap m) =
 (!) :: HFMap s f -> Key s a -> f a
 m ! k = fromJust (lookup k m)
 
-hfmapmap :: (forall x. f x -> g x) -> HFMap s f -> HFMap s g
-hfmapmap f (HFMap m) = HFMap (fmap (fmapf f) m)
+pfmap :: (forall x. f x -> g x) -> HFMap s f -> HFMap s g
+pfmap f (HFMap m) = HFMap (fmap (fmapf f) m)
