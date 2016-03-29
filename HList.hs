@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs, RankNTypes, DataKinds, TypeOperators, PolyKinds #-}
+{-# LANGUAGE GADTs, RankNTypes, DataKinds, TypeOperators, PolyKinds, TypeFamilies, UndecidableInstances #-}
 
 module HList where
 
@@ -42,3 +42,35 @@ instance TestEquality (HIndex l) where
   testEquality HHead     HHead     = Just Refl
   testEquality (HTail l) (HTail r) = testEquality l r
   testEquality _         _         = Nothing
+
+data N = S N | Z
+
+data Nat (n :: N) where
+  SZ :: Nat Z
+  SS :: Nat x -> Nat (S x)
+
+type family Snoc (l :: [*]) (x :: *) where
+  Snoc '[] x = x ': '[]
+  Snoc (h ':  t) x = h ': Snoc t x
+
+type family Reverse (l :: [*]) where
+  Reverse '[]      = '[]
+  Reverse (h ': t) = Snoc (Reverse t) h
+
+type family Index (l :: [*]) (i :: N) where
+  Index (h ': t) Z = h
+  Index (h ': t) (S i) = Index t i
+
+data WellFormed l x where
+  WellFormed :: Nat n -> WellFormed l (Index (Reverse l) n)
+
+data PHoas v a where
+  Var :: v a -> PHoas v a
+{-
+toHIndex :: Nat n -> HList l -> HIndex l (Index l n)
+toHIndex SZ (HCons h _) = HHead
+toHIndex (SS i) (HCons _ t) = HTail (toHIndex i t)
+
+toIndex :: WellFormed l x -> HList l -> HIndex l x
+toIndex (WellFormed i) = toHIndex i l
+-}

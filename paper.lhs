@@ -51,7 +51,6 @@ type KeyM
 newKey :: KeyM s (Key s a)
 instance Monad (KeyM s )
 instance TestEquality (Key s)
-hashKey :: Key s a -> Int
 runNameM :: (forall s. KeyM s a) -> a
 \end{code}
 \caption{The Key monad interface}
@@ -82,30 +81,26 @@ unlock k (Lock k' x) =
 \end{code}
 If we used the right key, we get |Just| the value in the box, and we get |Nothing| otherwise.
 
-To implement the |ST| monad using the |Key| monad, we also need a \emph{heterogeneous map}: a datastructure that that maps keys to values of the type corresponding to the key. To implement such maps efficiently, we use |IntMap|s and make use of the |hashKey| function.
+To implement the |ST| monad using the |Key| monad, we also need a \emph{heterogeneous map}: a datastructure that that maps keys to values of the type corresponding to the key. We can implement such maps as follows\footnote{For simplicity, this is a rather inefficient implementation, but a more efficient implementation using |IntMap|s can be given if we use a function |hashKey :: Key s a -> Int|}:
 \begin{code}
-newtype KeyMap s = Km (IntMap (Box s))
+newtype KeyMap s = Km [Box s]
 
 empty :: KeyMap s
-empty = Km IntMap.empty
-\end{code}
-In theory, multiple |Key|s can have the same hash, but in practice this is unlikely: this only occurs if we create more that $2^{32}$ keys. Hence for performance and simplicity, we map each integer only to a single box, but it is straightforward to adapt this code to use a list of boxes if one is worried about integer overflow. Inserting a new value consists of creating a box from the key-value pair, and inserting this in the |IntMap| at the hash of the |Key|:
-\begin{code}
+empty = Km []
+
 insert :: Key s a -> a -> KeyMap s -> KeyMap s
-insert k a (Km m) = Km $
-  IntMap.insert (hashKey k) (Lock k a)
-\end{code}
-A lookup in a |KeyMap| consists of obtaining the box for the hash of the key, and then unlocking the box with the key.
-\begin{code}
+insert k v (Km l) = Lock k v : l
+
 lookup :: Key s a -> KeyMap s -> Maybe a
-lookup k (Km m) =
-  do  box <- IntMap.lookup (hashKey k) m
-      unlock k box
+lookup k (Km l) = 
+   case l of
+    [] -> Nothing
+    (h:t) -> maybe (lookup k (KM t)) (unlock k)
 \end{code}
 Here, we employ the |Maybe| monad to sequence the operations, but the second operation, |unlock| cannot fail. Other operations, such as |update| and |(!)|, can be defined analogously.
 
 
-Armed with our newly obtained |KeyMap|s, we can implement the |ST| monad. The implementation of |STRef|s is simply as an alias for |Key|s:
+Armed with our newly obtained |KeyMap|s, we can inefficiently implement the |ST| monad. The implementation of |STRef|s is simply as an alias for |Key|s:
 \begin{code}
 type STRef s a = Key s a
 \end{code}
@@ -123,7 +118,7 @@ newSTRef v = do  k <- lift newKey
                  return k
 
 readSTRef :: STRef s a -> ST s a
-readSTRef r = (fromJust :. lookup r ) <$> get
+readSTRef r = (\env -> env ! r) <$> get
 
 writeSTRef :: STRef s a -> a -> ST s ()
 writeSTRef k v = modify (insert k v)
@@ -149,7 +144,7 @@ testEquality x y
 \end{code}
 Hence, another way to think of this paper is that we signal that the above function is safe, and that this allows us to do things which we could not do before.
 
-\section{Embedding Proc notation}
+\section{Embedding Arrow notation}
 
 \begin{figure}
   \rule{\columnwidth}{0.4pt}
@@ -164,136 +159,9 @@ class Arrow a where
 \label{arrowsdef}
 \end{figure}
 
-The |Arrow| type class, recalled in Figure \ref{arrowsdef}, was introduced by Hughes\cite{arrows} as an interface that is like monads, but which allows for more static information about the constructed computations to be extracted. While monads allow intermediate values in the computation to be named (using regular lambda-abstractions), the arrow interface does not allow us to name intermediate values in the computation, instead computations must be written in \emph{point-free style}. This is alleviated by |proc| notation\cite{arrownot}, which requires specialized compiler support. In this section we show that with the power of the |Key| monad, we can name intermediate values in arrow computations directly using lambda abstractions, leading to an \emph{embedded} form of |proc| notation, which does not require specialized compiler support.
+The |Arrow| type class, recalled in Figure \ref{arrowsdef}, was introduced by Hughes\cite{arrows} as an interface that is like monads, but which allows for more static information about the constructed computations to be extracted. While monads allow intermediate values in the computation to be named (using regular lambda-abstractions), the arrow interface does not allow us to name intermediate values in the computation, instead computations must be written in \emph{point-free style}. This is alleviated by Paterson's arrow notation\cite{arrownot}, which requires specialized compiler support. In this section we show that with the power of the |Key| monad, we can name intermediate values in arrow computations directly using lambda abstractions, leading to an \emph{embedded} form of Arrow notation, which does not require specialized compiler support.
 
-Before we show our embedded form of proc notation, let us first consider the difference between arrows and monad, by considering the difference between the state monad and the state arrow as an example(this example is taken from Lindley, Walder and Yallop \cite{idiomarrmonad}). The state monad and the state arrow have the following interfaces:
-\begin{code}
-newtype StateM s x = ...
-instance Monad (StateM s) where
-
-getM :: StateM s s
-putM :: s -> StateM s ()
-
-
-newtype StateA s x y = ...
-instance Arrow (StateA s) where
-getA :: StateA s () s
-putA :: StateA s s ()
-\end{code}
-As a first example, consider generating a unique number, which can be expressed monadically as follows:
-\begin{code}
-uniqueM :: StateM Int Int
-uniqueM = do  s <- getM
-              putM (s + 1)
-              return s
-\end{code}
-This can also be expressed using arrows, but since the arrow interface does not allow us to name intermediate values in the computation, the definition is in point-free style:
-\begin{code}
-uniqueA :: StateA Int () Int
-uniqueA =  getA >>> arr (\x -> (x +1, x)) >>>
-                first putA >>> arr snd
-\end{code}
-One can use |proc| notation to recover a more natural programming style, allowing intermediate values in arrow computations to be named. Using this notation, the unique number is obtained as follows:
-\begin{code}
-uniqueA :: StateA Int () Int
-uniqueA = procb () ->
-   do  x <- getA -< ()
-       putA -< x + 1
-       returnA -< x
-\end{code}
-This notation is supported by the GHC, which has fancy machinery to desugar it to a point-free definition.
-
-To see the difference in expressive power of monad and arrows, consider  deciding what to do based on the current state, which can be done using the state monad:
-\begin{code}
-ifZeroM ::  StateM Int a -> StateM Int a -> StateM Int a
-ifZeroM t f = do  s <- get
-                  if s == 0 then t else f
-\end{code}
-It is impossible to express this for the state arrow\cite{idiomarrmonad}. The reason is that arrows provide no way to run a computation recieved as input, which is precisely the difference between monads and arrows: adding the ability to run an arrow computation obtained as input via the |ArrowApply| extension to arrows, leads to a type class equivalent to monads\cite{arrows}.
-\begin{figure}
-  \rule{\columnwidth}{0.4pt}
-
-\begin{code}
-class RelativeMonad m v where
-  rreturn  :: v a -> m a
-  (.>>=)   :: m a -> (v a -> m b) -> m b
-  (.>>)    :: m a -> m b -> m b
-  m .>> n = m .>>= (\_ -> n)
-\end{code}
-Relative monad laws:
-\begin{code}
-  m .>>= rreturn            = m
-  rreturn x .>>= f          = f x
-  m .>>= (x -> k x .>>= h)  = (m .>>= k) .>>= h
-\end{code}
-
-\caption{The relative monad class and its lwas.}
-\label{relmonadfig}
-\end{figure}
-
-Recently,  Altenkirch, Chapman and Uustalu showed that in category theory, arrows are a special case of another generalization of monads, namely \emph{relative monads} \cite{relmonad}. We introduce a relative monad type class, corresponding to their categorial definition of relative monads, show in Figure \ref{relmonadfig}. The laws of the relative monad type class are the same as for the monad type class, replacing |return| by |rreturn| and |>>=| by |.>>=|. The difference is that relative monads have \emph{two} type parameters: one for the type of computations, |m|, and one for the type of the results of computations, |v|. With regular monads, the bind operation gives us a ``bare'' value of type |a|:
-\begin{code}
-(>>=) :: m a -> (a -> m b) -> m b
-\end{code}
-With relative monads, the operation |.>>=| gives the bound value wrapped in a type constructor |v|.
-
-It straightforward to see that relative monads are a \emph{generalization} of monads: each monad gives rise to a relative monad in the following way:
-\begin{code}
-newtype Id a = Id a
-instance Monad m => RelativeMonad m Id where
-  rreturn (Id x) = return x
-  m .>>= f = Id <$> m >>= f
-\end{code}
-
-More intrestingly, by chosing using an \emph{abstract} type constructor instead of |Id|, relative monads can also be used to limit the expressiveness of a language. We demonstrate this with a relative state monad, that does not allow us decide what to do based on the current state, i.e. it does not allow us to write |ifZeroM| above, making it exactly as powerfull as the state arrow. Consider the following interface:
-\begin{code}
-data StateRm v s a = ...
-
-instance RelativeMonad (StateRm v s) v
-
-getRm :: StateRm v s s
-putRm :: v s -> StateRm v s
-
-runStateRm :: (forall v.  Applicative v => StateRm v s x) ->
-              (s,x)
-\end{code}
-Note that the |runStateRm| function ensures that the type variable |v| is abstract.
-
-Using this interface, we can implement generating a unique number as follows:
-\begin{code}
-uniqueRm :: Applicative v => StateRm v Int Int
-uniqueRm =
-  getRm .>>= \s ->
-  putM ((+ 1) <$> s)  .>>
-  rreturn s
-\end{code}
-However, we cannot write |ifZeroM|, because there is no function:
-\begin{code}
-extract :: Applicative v => v a -> a
-\end{code}
-This state relative monad hence has exactly the same expressive power as the state arrow, but it allows us to name intermediate values using regular |lambda| abstractions, instead of relying on specialized compiler support.
-
-Can we implement a relative monad that allows us to construct arrow computations by using the relative monad interface to name intermediate values? It turns out that we can, but only if we using the extra power of the key monad. This gives us an \emph{embedded} variant of proc notation: we can name intermediate values, without relying on compiler support. The translation of Altenkrich et al. of arrows to relative monads does not form a relative monad in Haskell because their bind has type:
-\begin{code}
-bind :: Arrow a => a s x -> (forall s. (s -> x) -> a s y) -> a s y
-\end{code}
-This \emph{is} the bind for a relative monad in category theory, but not in Haskell: the types do not match up. Because...?
-
-Luckily, we can use the Key monad to obtain a construction similar to that of Altenkirch et al, which does allow us to name intermediate values in arrow computations using the relative monad interface. The interface of this construction is as follows:
-\begin{code}
-newtype Cage s = ...
-newtype Arm a s x = ...
-
-instance  Arrow a =>
-          RelativeMonad (Arm a s) (Cage s) where ...
-
-toRm :: Arrow a   =>
-   a x y -> (forall s. Cage s x -> Arm a s y)
-
-fromRm :: Arrow a =>
-  (forall s. Cage s x -> Arm a s y) -> a x y
-\end{code}
-As example, consider the following arrow computation in |proc| notation:
+As an example, consider the following arrow computation, which is written in the non-embedded arrow notation as follows:
 \begin{code}
 addA :: Arrow a => a b Int -> a b Int -> a b Int
 addA f g = procb z -> do
@@ -301,242 +169,258 @@ addA f g = procb z -> do
    y <- g -< z
    returnA -< x + y
 \end{code}
-Which becomes the following using the relative monad interface:
+The same arrow computation can be expressed using the \emph{embedded} arrow notation we develop in this section as follows: 
 \begin{code}
-(>-) :: Arrow a => Cage s x -> a x y -> Arm a s y
-v >- a = toRm a v
-
-addRm :: Arrow a => a b Int -> a b Int -> a b Int
-addRm f g = fromRm $ \z ->
-    z >- f .>>= \x ->
-    z >- g .>>= \y ->
-    rreturn ((+) <$> x <*> y)
+addA :: Arrow a => a b Int -> a b Int -> a b Int
+addA f g = proc $ \z -> do
+    x <- f -< z
+    y <- g -< z
+    return $ (+) <$> x <*> y
 \end{code}
-Aside from flipping the direction of reading, we must now also use the applicative interface to massage values.
+The |do| notation we use here is \emph{regular} monadic do notation. We use a function conviently called |proc| and use an infix function conviently called |(-<)|.
 
+The difference between |do| notation and |proc| notation is that in |proc| notation, one cannot observe intermediate values to decide what to do next. For example, we \emph{cannot} do the following:
+\begin{code}
+ifArrow ::  a Int x -> a Int x -> a Int x
+ifArrow t f = procb z -> do
+   case z of
+     0 -> t -< z
+     _ -> f -< z
+\end{code}
+Allowing this kind of behavior would make it impossible to translate |proc| notation to arrows, because this is exactly the power that monads have but that arrows lack \cite{idiomarrmonad}. To mimic this restriction in our embedded arrow notation, our function |(-<)| has the following type:
+\begin{code}
+(-<) :: Arrow a => a x y -> Cage s x -> 
+              ArrowSyn s (Cage s y)
+\end{code}
+Where |ArrowSyn| is the monad which we use to define our embedded arrow notation. The input and output of the arrow computations are enclosed in |Cage|s, which are named thusly because a value of type |Cage s x| does not allow observation of the value of the type |x| it ``contains''. The implementation of a |Cage| is as follows:
+\begin{code}
+newtype Cage s x = Cage { liberate :: KeyMap s -> x }
+  deriving (Functor, Applicative)
+\end{code}
+Informally, a |Cage| ``contains'' a value of type |x|, but in reality it does not contain a value of type |x| at all: it is a function from a |KeyMap| to a value of type |x|. Hence we can we sure that we do not allow pattern matching on the result of an arrow computation. 
 
-How do we implement this interface? We use |Key|s to represent a variable bound by |.>>=|, and |KeyMap| to represent an enviroment, i.e. a mapping of variables to values. A |Cage| is then an expression, i.e. a function from enviroment to value:
+By using |(-<)| and the monad interface, we can construct the syntax for the arrow computation that we are expressing. Afterwards, we use the following function to convert the syntax to an arrow:
 \begin{code}
-newtype Cage s x = Cage (KeyMap s -> x)
-   deriving (Functor,Applicative)
-\end{code}
-A variable can be easily converted to an expression:
-\begin{code}
-toExp :: Key s a -> Cage s a
-toExp k = Cage (\e -> e !  k)
-\end{code}
-
-
-
-Since each |.>>=| introduces a new variable, our implementation of the arrow relative monad, |Arm|, must be able to create new keys, and result in an arrow computation:
-\begin{code}
-newtype Arm a s x =
-   Arm { getArm :: KeyM s (a (KeyMap s) x) }
-\end{code}
-The arrow computation that is the result of the |KeyM| computation is an arrow computation from a enviroment, i.e. |KeyMap|, to a value.
-If we have the expression for the input, we can convert any arrow to this type by first evaluting the expression using the enviroment, and then passing it to the arrow:
-\begin{code}
-toArm :: Arrow a => a x y -> Cage s x -> Arm a s y
-toArm a (Cage f) = Arm (pure (arr f >>> a))
-\end{code}
-To implement |.>>=|, we need to be able to extend an enviroment.
-If we have a variable |k| for the result of the computation of type |x|, then we can convert an arrow computation of type |a (KeyMap s) x| to an arrow computation that extends the enviroment with a new mapping of the variable |k| to the value of type |x|:
-\begin{code}
-extend :: Arrow a => a (KeyMap s) y -> Key s y
-     -> a (KeyMap s) (KeyMap s)
-extend a k = a &&& arr id >>> arr (uncurry (insert k))
-\end{code}
-We can now implement the relative monad interface as follows:
-\begin{code}
-instance Arrow a =>
-  RelativeMonad (Arm a s) (Cage s) where
-  rreturn (Cage f)   = Arm (pure (arr f))
-  m .>>= f  = Arm $
-    do  al <- getArm m
-        k <- newKey
-        ar <- getArm (f (toExp k))
-        pure (extend al k >>> ar)
-\end{code}
-The implementation of |.>>=| first evaluates the |KeyM| computation of |m|, and then creates a new name (|Key|) for its result. This name is converted to an expression and passed to |f|, and the resulting |KeyM| computation is run. We then compose the two obtained arrows, |al|, and |ar|, by extending the enviroment given as input to |al| with the result of |al|, using name |k| and passing the resulting enviroment as input to |ar|.
-
-For the final piece of the puzzle, |fromRm| we create a variable for the input to the arrow, and feed it to the function in the same way as for |.>>=|:
-\begin{code}
-fromArm :: Arrow a => (forall s. Cage s x -> Arm a s y)
+proc ::  Arrow a => (forall s. Cage s x -> ArrowSyn a s y) 
          -> a x y
-fromArm f = runKeyM $
-     do k <- newKey
-        a <- getArm (f (toExp k))
-        return (arr (singleton k) >>> a)
 \end{code}
 
-
-\subsection{Inverse translation}
-
-While every monad gives rise to an arrow, not every relative monad gives rise to an arrow. In particular, relative monads give rise to an arrow if the type for results of computations |v| supports the |Applicative| interface. For regular monads, |v = Id|, which trivially supports |Applicative|. This translation is a generalization of the |Kleisli| construction which gives an arrow for each monad:
+Internally, the |ArrowSyn| monad builds an arrow from environment to environment, and creates names (keys) for values in these environments using |KeyM|.
 \begin{code}
-newtype RelKleisli m v a b =
-   RelKleisli {runK :: v a -> m b }
+newtype ArrowSyn a s x =
+    AS (WriterT (EndoA a (KeyMap s)) (KeyMap s) x)
+       deriving Monad
+\end{code}
+Where |EndoA a x| is an arrow from a type |x| to the same type:
+\begin{code}
+newtype EndoA a x = EndoA (a x x)
+\end{code}
+Such arrows form a monoid as follows:
+\begin{code}
+instance Arrow a => Monoid (EndoA a x) where
+    mempty = EndoA (arr id)
+    mappend (EndoA l) (EndoA r) = EndoA (l >>> r)
+\end{code}
+The standard writer monad transformer\cite{monadtrans} (|WriterT|) produces |mempty| for |return|, and composes the built values from from the left and right hand side of |>>=| using |mappend|, giving us precisely what we need for building arrows. 
 
-instance (Applicative v, RelativeMonad m v) =>
-    Arrow (RelKleisli m v) where
-  arr f = RelKleisli $ \x -> rreturn (f <$> x)
+The |KeyMap| here functions as an \emph{enviroment}, each result of an arrow notation via |(-<)| has its own name (|Key|), and a |Cage| is an expression, i.e. a function from enviroment to value, which may lookup names in the enviroment. The |Key| monad and the |KeyMap| allow us to model \emph{hetrogenous} enviroments which can be extended \emph{without changing} the \emph{type} of the enviroment. This is exactly the extra power we need to define this translation. 
 
-  f >>> g = RelKleisli $ \x -> runK f x .>>= (runK g)
 
-  first a = RelKleisli $ \t ->
-     let x = fst <$> t
-         y = snd <$> t
-      in runK a x .>>= \x' ->
-          rreturn ((,) <$> x' <*> y)
+
+To define the operations |proc| and |(-<)|, we first define some auxiliary arrows for manipulating environments. 
+We can easily convert a name (|Key|) to the expression (|Cage|) which consists of just that name:
+\begin{code}
+toCage :: Key s a -> Cage s a
+toCage k = Cage (\env -> env ! k)
+\end{code}
+We can introduce an environment from a single value, when given a name (|Key|) for that value. 
+\begin{code}
+introEnv :: Arrow a => Key s x -> a x (HMap s)
+introEnv k = arr (singleton k)
+\end{code}
+We also define an arrow to eliminate an environment, by interpreting an expression (|Cage|) using that environment:
+\begin{code}
+elimEnv ::  Cage s x -> a (HMap s) x
+elimEnv c = arr (liberate c)
+\end{code}
+Next to introducing and eliminating environments, we also need to extend an environment and evaluate an expression while keeping the environment:
+\begin{code}
+extendEnv :: Arrow a =>  Key s x ->
+                         a (x, HMap s) (HMap s)
+extendEnv k = arr (uncurry (insert k))
+
+withEnv :: Arrow a =>  Cage s x ->
+                       a (HMap s) (x, HMap s)
+withEnv c = dup >>> first (elimEnv c)
+    where dup = arr (\x -> (x,x))
 \end{code}
 
-\subsection{Correctness}
-
-A very similar construction has been introduced by Lindley, Wadler, and Yallop \cite{arrowcalc}, who introduce the \emph{arrow calculus}, which works similarly to our |Arm| construction. The main difference is that their arrow calculus is not embedded in Haskell, but theoretical and that in the arrow calculus there is no distiction between |Cage s a| and |a|, because their language does not allow the observation of values in (what can be seen as) relative monad syntax, omitting the need to make values abstact by putting them in |Cage|s.  Aside from this minor difference, the mapping of our constructs to theirs is as follows: \\[0.5cm]
-\begin{tabular}{l || l}
-Arrow calculus & Embedded proc \\
-\hline
-Types & \\
-\hline
-$ x\: !\: t$ & |x :: Arm a s t| \\
-$ x : t $ & | x :: t| (in pure context) \\
-$ x : t $ & |x :: Cage s t| (in arrow context)\\
-Expressions & \\
-\hline
-$\lambda^{\bullet}x . Q$ & |fromArm (\x -> Q)| \\
-$l \bullet m$ & |m .>>= toArm l| \\
-$\mathtt{let}\: x \Leftarrow p\: \mathtt{in}\: Q$ & |p .>>= \x -> Q| \\
-$[x]$ & |rreturn x| \\
-\end{tabular}\\[0.5cm]
-Lindley et al. also give laws for their arrow calculus, which are the relative monad laws plus two additional laws, which can be translated to our setting: :\\[0.5cm]
-\begin{tabular}{l l}
-$(\beta^{\rightsquigarrow})$  & $(\lambda^{\bullet}x . q) \bullet p = \mathtt{let}\: x \Leftarrow p\: \mathtt{in}\: q$ \\
-translation : & |P .>>= toArm (fromArm (\x -> Q))| \\
-& | = P .>>= \x -> Q | \\
-$(\eta^{\rightsquigarrow})$ & $ \lambda^{\bullet}x . (l \bullet [x])) = l$ \\
-translation &  |fromArm (\x -> rreturn x .>>= toArm Q) = Q | \\
-\end{tabular} \\[0.5cm]
-In our setup, these can in turn be proved from the relative monad laws and the following simpler laws: \\[0.5cm]
-\begin{tabular}{l l}
-$\mathit{iso}^{\rightarrow}$ & |toArm (fromArm f) = f | \\
-$\mathit{iso}^{\leftarrow}$ & |fromArm (toArm q) = q| \\
-\end{tabular}\\[0.5cm]
-
-Lindley et al. give a translation of their arrow calculus to arrows, which is essentially the same as our implementation of the |Arm| interface. They also give a translation from arrows to the arrow calculus, which is essentially the same as our |RelKleisli| construction. Lindey et al. prove of the equational correspondence of their arrow calculus and arrows. They do by showing that the arrow calculus laws follow from the translation to arrows and the arrow laws, and the arrow laws follow from the arrow calculus laws and the translation of arrows to the arrow calculus. Because they constructions is essentially the same it should be possible to adapt their proof of equational correspondence to our setting.
-
-
-
-
-
-
-\subsection{ArrowPlus and Relative monad plus}
-
-\subsection{ArrowLoop and Relative monad Fix}
-
-\subsection{Using monad for relative monads}
-
-\cite{bjorn}
-
-
-
-
-\section{Converting between representations of binders and names}
-
-What else can we do with the Key monad? The Key monad allows us to associate types with ``names'' (|Key|s), and to see that if two names are the same, then their associated types are also the same. One use case for this is when dealing with representations of syntax with binders, as we will show next.
-
-When implementing a compiler or an interpreter for a programming language or (embedded) DSL in Haskell, one needs to represent the (abstract) syntax of the programming language. It is desirable to construct the terms of a language with variable binding. in a way that guarantees that the terms are well-scoped. There are broadly two approaches to this problem, namely higher order abstract syntax (HOAS)\cite{hoas}, and  nested abstract syntax\cite{nested}. As we will show, there seems to be no way to translate terms created with HOAS to nested abstract syntax, but the Key monad allows us to cross this chasm.
-
-In HOAS, lambda terms are constructed using the methods from the following type class:
+With these auxiliary arrows, we can define functions that convert back and forth between a regular arrow and an arrow from environment to environment. To implement |(-<)|, we need to convert an arrow to an arrow from environment to environment, for which we need an expression for the input to the arrow, and a name for the output of the arrow:
 \begin{code}
-class Hoas f where
+toEnvA ::  Arrow a =>  
+           Cage s x  -> Key s y   -> 
+           a x y -> a (HMap s) (HMap s)
+toEnvA inC outK a  =
+   withEnv inC >>> first a >>> extendEnv outK
+\end{code}
+We first produce the input to the argument arrow, by interpreting the input expression using the input environment. We then execute the arguments arrow, and bind its output to the given name to obtain the output environment.
+
+In the other direction, to implement |arrowize| we need to convert an arrow from environment to environment back to an arrow of type |x| to type |y|, for which we instead need the name of the input and an expression for the output:
+\begin{code}
+fromEnvA ::  Arrow a =>
+             Key s x   -> Cage s y  ->
+             a (HMap s) (HMap s) -> a x y
+fromEnvA inK outC a  =
+   introEnv inK >>> a >>> elimEnv outC
+\end{code}
+We first bind the input to the given name to obtain the input environment. We then transform this environment to the output environment by running the arrow from environment to environment. Finally, we interpret the output expression in the output environment to obtain the output.
+
+The |(-<)| operation creates a name for the output and is given the input expression, which we use to convert the argument arrow using |toEnvA|: 
+\begin{code}
+(-<) :: Arrow a =>
+        a x y ->
+        (Cage s x -> ArrowSyn a s (Cage s y))
+a -< inC = AS $
+   do  outK <- lift newKey
+       tell (EndoA $ toEnvA inC a outK)
+       return (lookupVar outK)
+\end{code}
+Vice versa, the |proc| operation creates a name for the input and obtains the output expression, which we then uses to convert the obtained arrow from environment to environment using |fromEnvA|:
+\begin{code}
+proc ::  Arrow a =>
+             (forall s. Cage s x -> ArrowSyn a s (Cage s y)) ->
+             a x y
+proc f = runKeyM $
+      do  inK <- newKey
+          let AS m = f (lookupVar inK)
+          (outC, EndoA a) <- runWriterT m
+          return (fromEnvA inK a outC)
+\end{code} 
+
+Notice that while with this construction we can construct arrows with a monadic interface, instead of proc notation, this does \emph{not} mean that arrows are a special case of monads. Arrows are a generalization of monads\cite{arrows}, but there is another generalization of monads called \emph{relative monads}, which is a generalization of both arrows and monads\cite{relmonad}. Because all operations in the monad |ArrowSyn|, namely |(-<)|, give value of type |Cage s a| instead of a ``bare'' value of type |a|, our construction is actually a relative monad, but we use a trick\cite{bjorn} to make this into a monad.
+
+
+
+
+ 
+
+\section{Representations of variables in Syntax}
+
+What else can we do with the Key monad? The Key monad allows us to associate types with ``names'' (|Key|s), and to see that if two names are the same, then their associated types are also the same. Use cases for this especially pop up when dealing with representations of syntax with binders, as we will show next.
+
+\subsection{Typed names}
+
+A common way to represent the syntax of a programming language is to simply use strings or integers as names. For example, the untyped lambda calculus can be represented as follows:
+\begin{code}
+type Name = Int
+data Exp = Var Name
+         | Lam Name Exp
+         | App Exp Exp
+\end{code}
+
+If we want to represent a \emph{typed} representation of the lambda calculus, then this approach does not work anymore. Consider the following GADT:
+\begin{code}
+data TExp a where
+  Var :: Name -> TExp a
+  Lam :: Name -> TExp b -> TExp (a -> b)
+  App :: TExp (a -> b) -> TExp a -> TExp b
+\end{code}
+We cannot do much with this datatype: if we, for example, want to write an interpreter, then there is no type-safe way to represent the enviroment: we need to map strings to different types.
+
+With the |Key| monad, we \emph{can} extend this approach to typed representations. Consider the following data type:
+\begin{code}
+data KExp s a where
+  KVar :: Key s a -> KExp s a
+  KLam :: Key s a -> KExp s b -> KExp s (a -> b)
+  KApp :: KExp s (a -> b) -> KExp s a -> KExp s b
+\end{code}
+Because the names are now represented as keys, we can represented an enviroment as a |KeyMap|. We can even offer a Higher Order Abstract (HOAS) \cite{hoas} interface for constructing such terms by threading the key monad computation, which guarantees that all terms constructed with this interface are well-scoped:
+\begin{code}
+class Hoas f where 
   lam :: (f a -> f b)  -> f (a -> b)
   app :: f (a -> b)    -> (f a -> f b)
-\end{code}
-For example, the lambda term |(\x y -> x)| can be constructed as follows:
-\begin{code}
-example :: Hoas f => f (x -> y -> x)
-example = lam (\x -> lam (\y -> x))
-\end{code}
-The attractive thing of HOAS is that we use Haskell binding to construct syntax, and that terms built using the HOAS interface are always well-scoped, because of the well-scopeness of Haskell bindings.
 
-An example of a syntax representation that implements this interface is Parametric Higher-order abstract syntax (PHOAS) \cite{phoas, ags, graphs}. The PHoas represenation of typed lambda terms is:
+newtype HoasExp s a = 
+  He { getExp :: KeyM s (KExp s a) }
+
+instance Hoas (HoasExp s) where
+  lam f = He $ 
+        do k <- newKey 
+           b <- getExp (f (He (Var k)))
+           return (Lam k b)
+  app f x = He $ App <$> getExp f <*> getExp x
+\end{code}
+For instance, the lambda term |(\x y -> x)| can now be constructed with:
+\begin{code}
+lam (\x -> lam (\y -> x))
+\end{code}
+
+\subsection{Translating well-scoped representations}
+
+Using |Key|s to represent variables in syntax solves problem with typed representations, but it does not ensure that any value of type |TExp| is well-scoped. As far as we know, there two are representations of syntax which ensure that every value is well-scoped.  The first is Parametric Higher Order Abstract Syntax (HOAS)\cite{hoas, phoas, ags, graphs}, and the second is using typed de Bruijn indices\cite{nested}. However, there seems to be no way type-safe way to translate terms created with a PHoas term to typed de Bruijn indices, but the Key monad allows us to cross this chasm.
+ 
+In Parametric HOAS, typed lambda terms are represented by the following data type:
 \begin{code}
 data Phoas v a where
   PVar :: v a -> Phoas v a
   PLam :: (v a -> Phoas v b) -> Phoas v (a -> b)
   PApp :: Phoas v (a -> b) -> Phoas v a -> PHoas b
-
-instance Hoas (Phoas v) where
-  lam f  = PLam (f . Var)
-  app    = PApp
 \end{code}
 The reading of the type parameter |v| is the type of \emph{variables}.
-
-The second way to ensure well-scopedness is to use the type system to represent the enviroment of variables which are in scope\cite{nested,jp}. Terms which are not well-scoped will then lead to a type error, instead of a scoping error as with Hoas. We present our own modern variant of this technique using Data Kinds and GADTs, but it is essentially the same as presented by Bird and Paterson \cite{nested} . We start by using the standard GADTs for heterogenous lists and indexes in the lists:
+For example, the lambda term |(\x y -> x)| can be constructed as follows:
 \begin{code}
-data HList l where
-  HNil   :: HList []
-  HCons  :: h -> HList t -> HList (h : t)
+phoasExample :: Phoas v (x -> y -> x)
+phoasExample = PLam (\x -> PLam (\y -> x))
+\end{code}
+The attractive thing of Parametric HOAS is that we use Haskell binding to construct syntax, and that terms of type |(forall v. Phoas v a)| are always well-scoped\cite{phoas}.
 
+The second way to ensure well-scopedness is to use typed de Bruijn indices. We present our own modern variant of this technique using Data Kinds and GADTs, but the idea is essentially the same as presented by Bird and Paterson \cite{nested} . Typed de Bruijn indices can represented as follows:
+\begin{code}
 data Index l a where
   HHead  :: Index (h : t) h
   HTail  :: Index t x -> Index (h : t) x
 \end{code}
-If we think of a |HList l| as an enviroment, where |l| is the list of types in the enviroment, then |Index l a| is a de Bruijn index in such an enviroment, of type |a|. We can use this insight to represent lambda terms as follows:
+Here |l| is a type-level list representing the types in the enviroment, and an |Index l a| is a de Bruijn index in such an enviroment, of type |a|. We can use this insight to represent lambda terms as follows:
 \begin{code}
-data NSyn l a where
-  NVar  :: Index l a -> NSyn l a
-  NLam  :: NSyn (a : l) b -> NSyn l (a -> b)
-  NApp  :: NSyn l (a -> b) -> NSyn l a -> NSyn l b
+data Bruijn l a where
+  BVar  :: Index l a -> Bruijn l a
+  BLam  :: Bruijn (a : l) b -> Bruijn l (a -> b)
+  BApp  :: Bruijn l (a -> b) -> Bruijn l a -> Bruijn l b
 \end{code}
-The reading of the type variable |l| is the list of types which are in the enviroment, and hence the enviroment is extended in the body of a lambda term. A closed term of type |a| has type |NSyn [] a|.
+A closed term of type |a| has type |Bruijn [] a|.
 
-This technique ensures that all variables are well scoped, but when writing lambda expressions, we must now manually write de Bruijn indexes for variables. For example, the lambda term |(\x y -> x)| becomes:
+
+The types |(forall v. PHoas v a)| and |(Bruijn [] a)| both represent well-scoped typed lambda terms (and |undefined|), but there seems to be no way to translate the former into the latter, without using extensions such as the |Key| monad. In other words there seems to be no function of type:
 \begin{code}
-nsexample :: NSyn [] (x -> y -> x)
-nsexample = NLam (NLam (HTail HHead))
-\end{code}
-There are techniques which alleviate the need to manually use the de Bruijn indexes\cite{jp}, which rely on type-level computation to do the lookup of variables. These make the user-interface a bit more complicated and lead to type-errors for scoping errors, instead of regular scoping errors. Because in nested syntax a binding changes the type of the syntax represenation, there seem to be no instance for |Hoas| for |NSyn|.
+phoasToBruijn :: (forall v. PHoas v a) -> NSyn [] a
+\end{code} 
+This seems to be not only in Haskell without extension, but in dependently typed languages without extensions as well. When using |PHoas| in \emph{Coq} to prove properties about programming languages, an small extension to the logic in the form of a special well-formedness axiom for the |PHoas| datatype is needed to translate PHoas to de Bruijn indices\cite{phoas}. The |Key| monad is a general extension, which allows us to implement |phoasToBruijn|.
 
-The well-scopedness of variables in an |NSyn| value follows from the fact that the value is well-typed. With |Hoas|, the well-scopedness relies on the meta-level (i.e. not formalized through types) argument that no well-scoped values can be created by using the |Hoas| interface. The internal (i.e. formalized through types) well-scopedness of |NSyn| allows interpretations of syntax which seem to not be possible if we are using terms constructed with HOAS. As an example of this, consider translating lambda terms to \emph{cartesian closed category} combinators (the categorical version of the lambda calculus). This can be done if the lambda terms are given as |NSyn| values, as demonstrated in Figure \ref{ccc}. Without the Key monad, there seem to be no way to do the same for terms constructed with the HOAS terms (in Haskell).
+The well-scopedness of variables in an |Bruijn| value follows from the fact that the value is well-typed. With |PHoas|, the well-scopedness relies on the meta-level (i.e. not formalized through types) argument that no well-scoped values can be created by using the |PHoas| interface. The internal (i.e. formalized through types) well-scopedness of |Bruijn| allows interpretations of syntax which seem to not be possible if we are using terms constructed with |PHoas|. As an example of this, consider translating lambda terms to \emph{cartesian closed category} combinators (the categorical version of the lambda calculus). This can be done if the lambda terms are given as |Bruijn| values, as demonstrated in Figure \ref{ccc}. Without the Key monad, there seem to be no way to do the same for terms constructed with the PHoas terms.
 
-We want to have our cake and eat it two: we want to build terms using the simple |Hoas| interface, and then convert them to a representation where the types in the enviroment are explicit. In other words, we want a translation function of the following type:
+Our translation works by first translating |PHoas| to the |TExp| from the previous section, and then translating that to nested de bruijn indices. The first step in this translation is straightforwardly defined as follows: 
 \begin{code}
-makeMorePrecise :: (forall f. Hoas f => f x) -> NSyn [] x
+phoasToKey :: (forall v. PHoas v a) -> (forall s. KeyM (KExp s a))
+phoasToKey t = go t where
+  go :: PHoas (Key s) a -> KeyM s (KLam s a)
+  go (PVar x)    = return (KVar x)
+  go (PLam f)    = do  v <- newKey
+                       b <- go (f v)
+                       return (KLam v b)
+  go (PApp f x)  = KApp <$> go f <*> go x
 \end{code}
-There seem to be no way to implement this function without the added power of the Key monad. With the Key monad we \emph{can} implement this function, which transitively also allows us do anything with HOAS terms what we can do with nested syntax terms, such as translating to cartesian closed categories.
-
-To facilitate this translation, let us introduce a representation of lambda terms where |Key|s are used as variables:
-\begin{code}
-data KLam s a where
-  KVar :: Key s a -> KLam s a
-  KLam :: Key s a -> KLam s b -> KLam s (a -> b)
-  KApp :: KLam s (a -> b) -> KLam s a -> KLam s b
-\end{code}
-Here the arguments to the constructor for lamdba abstraction, |KLam|, are the fresh variable for the argument, of type |Key|, and the body of the lambda abstraction. To provide an instance of |Hoas| for this representation of lambda terms, we wrap a |KeyM| computation resulting in a |KLam| value, in a single type:
-\begin{code}
-newtype KeyMLam s a = KL (KeyM s (KeyLam s a))
-
-instance Hoas (KeyMLam s) where
-  lam f = KL $
-     do  k <- newKey
-         let KL m = f (KL (pure $ KVar k))
-         b <- m
-         return $ KLam k b
-  app (KL f) (KL x) = KL $ KApp <$> f <*> x
-\end{code}
-The |lam| function creates a new key for the lambda abstraction, and passes it to the body.
 
 We will now show how we can create a function of type:
 \begin{code}
-toNSyn :: KeyLam s a -> NSyn [] a
+keyToBruijn :: KExp s a -> Bruijn [] a
 \end{code}
-Since |KeyMLam| implements |Hoas| we can then implement |makeMorePrecise| as follows:
+Using this function, we can then implement |phoas2nested| as follows:
 \begin{code}
-makeMorePrecise :: (forall f. Hoas f => f x) -> NSyn [] x
-makeMorePrecise (KL m) = runKeyM (toNSyn <$> m)
+phoasToBruijn :: (forall v. PHoas v x) -> Bruijn [] x
+phoasToBruijn p = runKeyM 
+   (keyToBruijn <$> phoasToKey p)
 \end{code}
-For the |toNSyn| function, we need a variant of the |Box| we saw previously:
+To implement the |keyToBruijn| function, we need a variant of the |Box| we saw previously:
 \begin{code}
 data FBox s f where
   FLock :: Key s a -> f a -> FBox s f
@@ -556,7 +440,7 @@ instance PFunctor (FBox s) where
   pfmap f (FLock k x) = FLock k (f x)
 \end{code} We also need a variant of the |KeyMap|, where we store |FBox|es instead of regular boxes:
 \begin{code}
-newtype FKeyMap s f = FKm (IntMap (FBox s f))
+newtype FKeyMap s f = FKm [FBox s f]
 insert :: Key s a -> f a -> FKeyMap s f  -> FKeyMap s f
 lookup :: Key s a -> FKeyMap s f -> Maybe (f a)
 \end{code}
@@ -566,7 +450,7 @@ instance PFunctor (FKeyMap s) where
   pfmap f (FKm m) = FKm (fmap (pfmap f) m)
 \end{code}
 
-We store the current ``enviroment'' as a |FKeyMap| mapping each |Key| to an |Index| in the current enviroment. When we enter a lambda-body, we need to extend the enviroment with a new name mapping to the ``de Bruijn index'' |HHead|, and add one lookup step to each other ``de Bruijn index'' currently in the |FKeyMap|. This is be done as follows:
+We store the current ``enviroment'' as a |FKeyMap| mapping each |Key| to an |Index| in the current enviroment. When we enter a lambda-body, we need to extend the enviroment with a new name mapping to the ``de Bruijn index'' |HHead|, and add one lookup step to each other de Bruijn index currently in the |FKeyMap|. This is be done as follows:
 \begin{code}
 extend :: Key s h -> FKeyMap s (Index t) ->
             FKeyMap s (Index (h : t))
@@ -574,13 +458,14 @@ extend k m = insert k HHead (pfmap HTail m)
 \end{code}
 With this machinery in place, we can translate |KeyLam| to |NSyn| as follows:
 \begin{code}
-toNSyn :: KeyLam s a -> NSyn [] a
-toNSyn = go empty where
-  go :: HFMap s (HIndex l) -> KeyLam s x -> NSyn l x
+keyToBruijn :: KExp s a -> Bruijn [] a
+keyToBruijn = go empty where
+  go :: HFMap s (HIndex l) -> KExp s x -> Bruijn l x
   go e (KVar v)   = NVar (e ! v)
-  go e (KLam k b) = NLam (translate (extend k e) b)
-  go e (KApp f x) = NApp (translate e f) (translate e x)
+  go e (KLam k b) = NLam (go (extend k e) b)
+  go e (KApp f x) = NApp (go e f) (go e x)
 \end{code}
+Notice that this translation may fail if we lookup a key in the enviroment which does not exists, but that this cannot happen if the |KExp| value is well-scoped, which is always the case when we translate |PHoas| to |KExp|.
 
 
 
@@ -589,13 +474,13 @@ toNSyn = go empty where
 
 \begin{figure}
 \begin{code}
-toClosed :: CCC c => NSyn [] (x -> y) -> c () (x -> y)
+toClosed :: CCC c => Bruijn [] (x -> y) -> c () (x -> y)
 toClosed p = go p TNil where
   go :: CCC c => NSyn l y -> TList l (c x) -> c x y
-  go (NVar x)    e = findex e x
-  go (NLam b)    e = curry $
+  go (BVar x)    e = findex e x
+  go (BLam b)    e = curry $
                     go b (TCons snd (tmap (. fst) e))
-  go (NApp f x)  e = uncurry (go f e) . prod id (go x e)
+  go (BApp f x)  e = uncurry (go f e) . prod id (go x e)
 
 class Category c => CCC c where
     prod     :: c x a -> c x b -> c x (a,b)

@@ -8,6 +8,7 @@ import KeyM
 --import HFMap
 import HMap
 import HList
+import Control.Monad.Writer
 
 
 
@@ -34,6 +35,9 @@ newtype C x a = C (x -> a) deriving (Functor,Applicative)
 
 
 newtype Cage s x = Cage (HMap s -> x) deriving (Functor,Applicative)
+
+newtype ArrowSyn a s x = As {runArrowSyn :: WriterT (a (HMap s) (HMap s)) (KeyM s x)}
+
 newtype Arm a s x = Arm { getArm :: KeyM s (a (HMap s) x) }
 
 class RelativeMonad m v where
