@@ -7,6 +7,12 @@
 \usepackage{marvosym}
 \usepackage{graphicx}
 \usepackage{wasysym}
+\usepackage{multirow}
+\usepackage{array}
+\newcolumntype{L}[1]{>{\raggedright\let\newline\\\arraybackslash\hspace{0pt}}m{#1}}
+\newcolumntype{C}[1]{>{\centering\let\newline\\\arraybackslash\hspace{0pt}}m{#1}}
+\newcolumntype{R}[1]{>{\raggedleft\let\newline\\\arraybackslash\hspace{0pt}}m{#1}}
+
 
 \newcommand{\app}{\mathbin{<\!\!\!\!\mkern1.4mu\raisebox{-1.55pt}{\scalebox{0.9}{*}}\mkern1.4mu\!\!\!\!>}}
 \newcommand{\aplus}{\mathbin{<\!\!\!\!\mkern1.4mu +\mkern1.4mu\!\!\!\!>}}
@@ -25,9 +31,10 @@
 %format <*> = "\app"
 %format <$> = "\fmap"
 %format <+> = "\aplus"
-
-
-
+%format E1 = "E_1"
+%format E2 = "E_2"
+%format EN = "E_n"
+%format uncurryn = "\mathit{uncurry}_n"
 \title{Dynamic typing, Unconstrained!}
 \authorinfo{Koen Claessen, Pablo Buiras, Atze van der Ploeg}{Chalmers University of Technology}
            {atze@@chalmers.se}
@@ -41,31 +48,32 @@
 
 \section{The Key Monad}
 
+
+
+
 \begin{figure}
-
+  \rule{\columnwidth}{0.4pt}
 \begin{code}
-
 type Key
 type KeyM
 
+instance Monad (KeyM s)
+
 newKey :: KeyM s (Key s a)
-instance Monad (KeyM s )
-instance TestEquality (Key s)
-runNameM :: (forall s. KeyM s a) -> a
+
+testEquality :: KeyM s a -> Key s b -> Maybe (a :~: b)
+
+data a :~: b where
+  Refl :: a :~: a
+
+runKeyM :: (forall s. KeyM s a) -> a
 \end{code}
 \caption{The Key monad interface}
 \label{interface}
 \end{figure}
 
-The interface of our proposed extension, called the ``Key Monad'', is show in Figure \ref{interface}. The interface features two abstract types (types of which the constructors are not available to the user), |Key| and |KeyM|. The Key Monad, |KeyM|, gives the user the power to create fresh ``names'' of type |Key|. The only operation that is supported on this type is:
-\begin{code}
-testEquality :: Key s a -> Key s b -> Maybe (a :~: b)
-\end{code}
-This function checks if the two given names are the same, and if they are a ``proof'' is returned that the types assocatied with the names, |a| and |b|, are the \emph{same} types. The proof that the types |a| and |b| are the same, is a value of the following GADT:
-\begin{code}
-data a :~: b where
-  Refl :: a :~: a
-\end{code}
+The interface of our proposed extension, called the ``Key Monad'', is show in Figure \ref{interface}. The interface features two abstract types (types of which the constructors are not available to the user), |Key| and |KeyM|. The Key Monad gives the user the power to create a new, unique, |Key s| via |newKey|. The only operation that is supported on the type |Key| is |testEquality|, which checks if two given keys are the same, and if they are a ``proof'' is returned that the types assocatied with the names are the \emph{same} types. A ``proof'' of the equality of type |a| and |b| is given as the GADT |a :~: b|. The |KeyM| computation can be run with |runKeyM|, which requires that the type argument |s| is polymorphic, ensuring that |Key|s cannot escape the |KeyM| computation. 
+
 
 We can use |Key|s to do similar things as with |Data.Typeable|, but \emph{without} the need for |Typeable| constraints. For instance, we can create a variant of |Dynamic| using |Key|s instead of type representations. When given a key and value, we can ``lock up'' the value in a box, which, like |Dynamic|, hides the type of its contents.
 \begin{code}
@@ -80,6 +88,7 @@ unlock k (Lock k' x) =
     Nothing    -> Nothing
 \end{code}
 If we used the right key, we get |Just| the value in the box, and we get |Nothing| otherwise.
+
 
 To implement the |ST| monad using the |Key| monad, we also need a \emph{heterogeneous map}: a datastructure that that maps keys to values of the type corresponding to the key. We can implement such maps as follows\footnote{For simplicity, this is a rather inefficient implementation, but a more efficient implementation using |IntMap|s can be given if we use a function |hashKey :: Key s a -> Int|}:
 \begin{code}
@@ -98,7 +107,6 @@ lookup k (Km l) =
     (h:t) -> maybe (lookup k (KM t)) (unlock k)
 \end{code}
 Here, we employ the |Maybe| monad to sequence the operations, but the second operation, |unlock| cannot fail. Other operations, such as |update| and |(!)|, can be defined analogously.
-
 
 Armed with our newly obtained |KeyMap|s, we can inefficiently implement the |ST| monad. The implementation of |STRef|s is simply as an alias for |Key|s:
 \begin{code}
@@ -144,6 +152,70 @@ testEquality x y
 \end{code}
 Hence, another way to think of this paper is that we signal that the above function is safe, and that this allows us to do things which we could not do before.
 
+
+
+The behavior of the Key monad is more precisely specified by the monad laws and the Key monad laws shown in Figure \ref{laws}. The |sameKey| and |distinctKey| laws describe the behavior of |testEquality|. The notation |E[x]| in these laws, means the expression |x| in an arbitrary expression context |E[]| (such that the free variables of |x| are not bound by |E[]|). 
+
+\begin{figure}
+\hspace{-0.7cm}
+\begin{tabular}{ r  c  l r}
+\begin{minipage}{0.42\columnwidth}
+\begin{code}
+do  k <- newKey 
+    E[testEquality k k]
+\end{code}
+\end{minipage}& |=| & \hspace{-0.5cm}\begin{minipage}{0.3\columnwidth}
+\begin{code}
+do  k <- newKey 
+    E[Just Refl]
+\end{code}
+\end{minipage}& (|sameKey|) \\[-0.2cm]
+\begin{minipage}{0.42\columnwidth}
+\begin{code}
+do  k <- newKey 
+    l <- newKey
+    E[testEquality k l]
+\end{code}
+\end{minipage}&  |=| & \hspace{-0.5cm}\begin{minipage}{0.3\columnwidth}
+\begin{code}
+do  k <- newKey 
+    l <- newKey
+    E[Nothing]
+\end{code}
+\end{minipage}& (|distinctKey|) \\[-0.2cm] \begin{minipage}{0.22\columnwidth}
+\begin{code}
+do  x <- m 
+    y <- n
+    f x y
+\end{code}
+\end{minipage}
+ &  |=| & \hspace{-0.5cm}\begin{minipage}{0.2\columnwidth}
+\begin{code}
+do  y <- n
+    x <- m
+    f x y
+\end{code}
+\end{minipage}
+& (|commutative|) \\[-0.2cm]
+\begin{minipage}{0.15\columnwidth} \begin{code}m >> n\end{code}\end{minipage} & |=| & \hspace{-0.5cm}\begin{minipage}{0.1\columnwidth} \begin{code} n\end{code} \end{minipage} & (|purity|)  \\[-0.2cm]
+\begin{minipage}{0.35\columnwidth} \begin{code} runKey (return x) \end{code}\end{minipage}& |=| &\hspace{-0.55cm} \begin{minipage}{0.1\columnwidth} \begin{code}x\end{code} \end{minipage} & (|runReturn|) \\[-0.2cm]
+\begin{minipage}{0.35\columnwidth} \begin{code} runKey (f <$> m)\end{code} \end{minipage}  & |=| & \hspace{-0.5cm}\begin{minipage}{0.3\columnwidth} \begin{code}f (runKey m)\end{code}\end{minipage} & (|runF|) \\[-0.15cm]
+\multicolumn{3}{c}{(if |m :: forall s. KeyM s a|)} & 
+\end{tabular}
+\caption{Key monad laws}
+\label{laws}
+\end{figure}
+
+The |commutative| law states that the Key monad is a commutative monad: the order of actions does not matter. The |purity| law might be a bit suprising: it states that doing some Key computation and then throwing away the result is the same as not doing anything at all! The reason for this is that the only property of each key is that it is distinct from all other keys: hence making keys and then throwing them away has no effect on the rest of the computation.
+
+The last two laws, |runReturn| and |runF|,  state how we can get the values out of a |KeyM| computation with |runKey|. The |runF| law states that we can lazily get the results of a (potentially) infinite |KeyM| computation. The side condition that |m| has type |forall s. KeyM s a| (for some type |a|) rules out wrong specialization of the law, such as:  
+\begin{code}
+runKey (f <$> newKey) = f (runKey newKey)
+\end{code}
+This specialization does \emph{not} hold because, the left hand side type-checks, but the right hand side does not: the ``s'' would escape. 
+
+
+
 \section{Embedding Arrow notation}
 
 \begin{figure}
@@ -159,9 +231,24 @@ class Arrow a where
 \label{arrowsdef}
 \end{figure}
 
-The |Arrow| type class, recalled in Figure \ref{arrowsdef}, was introduced by Hughes\cite{arrows} as an interface that is like monads, but which allows for more static information about the constructed computations to be extracted. While monads allow intermediate values in the computation to be named (using regular lambda-abstractions), the arrow interface does not allow us to name intermediate values in the computation, instead computations must be written in \emph{point-free style}. This is alleviated by Paterson's arrow notation\cite{arrownot}, which requires specialized compiler support. In this section we show that with the power of the |Key| monad, we can name intermediate values in arrow computations directly using lambda abstractions, leading to an \emph{embedded} form of Arrow notation, which does not require specialized compiler support.
-
-As an example, consider the following arrow computation, which is written in the non-embedded arrow notation as follows:
+The |Arrow| type class, recalled in Figure \ref{arrowsdef}, was introduced by Hughes\cite{arrows} as an interface that is like monads, but which allows for more static information about the constructed computations to be extracted. However, in contrast to monads, arrows do not directly allow intermediate values to be named using regular lambda abstractions. As an example, an arrow computation which feeds the same input to two arrows, and adds their outputs, can be expressed as follows:
+\begin{code}
+addA :: Arrow a => a x Int -> a x Int -> a x Int
+addA f g =  arr (\x -> (x,x))  >>> first f >>> 
+            second g           >>> arr (\(x,y) -> x + y)
+  where  second x = flip >>> first x >>> flip
+         flip     = arr (\(x,y) -> (y,x))
+\end{code}
+With monads, a similar computation could be written by naming intermediate values:
+\begin{code}
+addM :: Monad m =>  (x -> m Int) -> (x -> m Int) -> 
+                    (x -> m Int)
+addM f g = \z ->
+    do x <- f z
+       y <- g z
+       return (x + y)
+\end{code}
+To overcome this downside of arrows, Paterson's introduced arrow notation\cite{arrownot}. In this notation, the above arrow computation can be written as follows:
 \begin{code}
 addA :: Arrow a => a b Int -> a b Int -> a b Int
 addA f g = procb z -> do
@@ -169,7 +256,9 @@ addA f g = procb z -> do
    y <- g -< z
    returnA -< x + y
 \end{code}
-The same arrow computation can be expressed using the \emph{embedded} arrow notation we develop in this section as follows: 
+Specialized compiler support is offered by the GHC, which desugars this notation into an equivalent, point free, expressions. 
+
+In this section, we show that with the Key monad, we can name intermediate values in arrow computations using \emph{regular} monadic do notation, without relying on specialized compiler support. The same arrow computation can be expressed using our \emph{embedded} arrow as follows: 
 \begin{code}
 addA :: Arrow a => a b Int -> a b Int -> a b Int
 addA f g = proc $ \z -> do
@@ -177,7 +266,7 @@ addA f g = proc $ \z -> do
     y <- g -< z
     return $ (+) <$> x <*> y
 \end{code}
-The |do| notation we use here is \emph{regular} monadic do notation. We use a function conviently called |proc| and use an infix function conviently called |(-<)|.
+We use a function conviently called |proc| and use an infix function conviently called |(-<)|.
 
 The difference between |do| notation and |proc| notation is that in |proc| notation, one cannot observe intermediate values to decide what to do next. For example, we \emph{cannot} do the following:
 \begin{code}
@@ -197,7 +286,7 @@ Where |ArrowSyn| is the monad which we use to define our embedded arrow notation
 newtype Cage s x = Cage { liberate :: KeyMap s -> x }
   deriving (Functor, Applicative)
 \end{code}
-Informally, a |Cage| ``contains'' a value of type |x|, but in reality it does not contain a value of type |x| at all: it is a function from a |KeyMap| to a value of type |x|. Hence we can we sure that we do not allow pattern matching on the result of an arrow computation. 
+Informally, a |Cage| ``contains'' a value of type |x|, but in reality it does not contain a value of type |x| at all: it is a function from a |KeyMap| to a value of type |x|. Hence we can we sure that we do not allow pattern matching on the result of an arrow computation to decide the rest of the arrow computation, because the result is simply not available yet.
 
 By using |(-<)| and the monad interface, we can construct the syntax for the arrow computation that we are expressing. Afterwards, we use the following function to convert the syntax to an arrow:
 \begin{code}
@@ -221,9 +310,9 @@ instance Arrow a => Monoid (EndoA a x) where
     mempty = EndoA (arr id)
     mappend (EndoA l) (EndoA r) = EndoA (l >>> r)
 \end{code}
-The standard writer monad transformer\cite{monadtrans} (|WriterT|) produces |mempty| for |return|, and composes the built values from from the left and right hand side of |>>=| using |mappend|, giving us precisely what we need for building arrows. 
+The standard writer monad transformer, |WriterT|, produces |mempty| for |return|, and composes the built values from from the left and right hand side of |>>=| using |mappend|, giving us precisely what we need for building arrows. 
 
-The |KeyMap| here functions as an \emph{enviroment}, each result of an arrow notation via |(-<)| has its own name (|Key|), and a |Cage| is an expression, i.e. a function from enviroment to value, which may lookup names in the enviroment. The |Key| monad and the |KeyMap| allow us to model \emph{hetrogenous} enviroments which can be extended \emph{without changing} the \emph{type} of the enviroment. This is exactly the extra power we need to define this translation. 
+The |KeyMap| in this construction functions as an \emph{enviroment}, each result of an arrow notation via |(-<)| has its own name (|Key|), and a |Cage| is an expression, i.e. a function from enviroment to value, which may lookup names in the enviroment. The |Key| monad and the |KeyMap| allow us to model \emph{hetrogenous} enviroments which can be extended \emph{without changing} the \emph{type} of the enviroment. This is exactly the extra power we need to define this translation. 
 
 
 
@@ -310,7 +399,7 @@ What else can we do with the Key monad? The Key monad allows us to associate typ
 
 \subsection{Typed names}
 
-A common way to represent the syntax of a programming language is to simply use strings or integers as names. For example, the untyped lambda calculus can be represented as follows:
+A straightforward way to represent the syntax of a programming language is to simply use strings or integers as names. For example, the untyped lambda calculus can be represented as follows:
 \begin{code}
 type Name = Int
 data Exp = Var Name
@@ -344,10 +433,9 @@ newtype HoasExp s a =
   He { getExp :: KeyM s (KExp s a) }
 
 instance Hoas (HoasExp s) where
-  lam f = He $ 
-        do k <- newKey 
-           b <- getExp (f (He (Var k)))
-           return (Lam k b)
+  lam f = He $ do  k <- newKey 
+                   b <- getExp (f (He (Var k)))
+                   return (Lam k b)
   app f x = He $ App <$> getExp f <*> getExp x
 \end{code}
 For instance, the lambda term |(\x y -> x)| can now be constructed with:
@@ -357,7 +445,7 @@ lam (\x -> lam (\y -> x))
 
 \subsection{Translating well-scoped representations}
 
-Using |Key|s to represent variables in syntax solves problem with typed representations, but it does not ensure that any value of type |TExp| is well-scoped. As far as we know, there two are representations of syntax which ensure that every value is well-scoped.  The first is Parametric Higher Order Abstract Syntax (HOAS)\cite{hoas, phoas, ags, graphs}, and the second is using typed de Bruijn indices\cite{nested}. However, there seems to be no way type-safe way to translate terms created with a PHoas term to typed de Bruijn indices, but the Key monad allows us to cross this chasm.
+The datatype |KExp| does not ensure that any value of type |KExp| is well-scoped. As far as we know, there two are representations of syntax which ensure that every value is well-scoped.  The first is Parametric Higher Order Abstract Syntax (HOAS)\cite{hoas, phoas, ags, graphs}, and the second is using typed de Bruijn indices\cite{nested}. However, there seems to be no way type-safe way to translate terms created with a PHoas term to typed de Bruijn indices, but the Key monad allows us to cross this chasm.
  
 In Parametric HOAS, typed lambda terms are represented by the following data type:
 \begin{code}
@@ -390,17 +478,18 @@ data Bruijn l a where
 A closed term of type |a| has type |Bruijn [] a|.
 
 
-The types |(forall v. PHoas v a)| and |(Bruijn [] a)| both represent well-scoped typed lambda terms (and |undefined|), but there seems to be no way to translate the former into the latter, without using extensions such as the |Key| monad. In other words there seems to be no function of type:
+The types |(forall v. PHoas v a)| and |(Bruijn [] a)| both represent well-scoped typed lambda terms (and |undefined|), but there seems to be no way to translate the former to the latter, without using extensions such as the |Key| monad. In other words there seems to be no function of type:
 \begin{code}
 phoasToBruijn :: (forall v. PHoas v a) -> NSyn [] a
 \end{code} 
-This seems to be not only in Haskell without extension, but in dependently typed languages without extensions as well. When using |PHoas| in \emph{Coq} to prove properties about programming languages, an small extension to the logic in the form of a special well-formedness axiom for the |PHoas| datatype is needed to translate PHoas to de Bruijn indices\cite{phoas}. The |Key| monad is a general extension, which allows us to implement |phoasToBruijn|.
+This seems to be not only be impossible in Haskell without extensions, but in dependently typed languages without extensions as well. When using |PHoas| in \emph{Coq} to prove properties about programming languages, an small extension to the logic in the form of a special well-formedness axiom for the |PHoas| datatype is needed to translate PHoas to de Bruijn indices\cite{phoas}. The |Key| monad is a general extension, which allows us to implement |phoasToBruijn|.
 
-The well-scopedness of variables in an |Bruijn| value follows from the fact that the value is well-typed. With |PHoas|, the well-scopedness relies on the meta-level (i.e. not formalized through types) argument that no well-scoped values can be created by using the |PHoas| interface. The internal (i.e. formalized through types) well-scopedness of |Bruijn| allows interpretations of syntax which seem to not be possible if we are using terms constructed with |PHoas|. As an example of this, consider translating lambda terms to \emph{cartesian closed category} combinators (the categorical version of the lambda calculus). This can be done if the lambda terms are given as |Bruijn| values, as demonstrated in Figure \ref{ccc}. Without the Key monad, there seem to be no way to do the same for terms constructed with the PHoas terms.
+The well-scopedness of variables in a |Bruijn| value follows from the fact that the value is well-typed. With |PHoas|, the well-scopedness relies on the meta-level (i.e. not formalized through types) argument that no well-scoped values can be created by using the |PHoas| interface. The internal (i.e. formalized through types) well-scopedness of |Bruijn|, allows interpretations of syntax which seem to not be possible if we are using terms constructed with |PHoas|. As an example of this, consider translating lambda terms to \emph{cartesian closed category} combinators (the categorical version of the lambda calculus). This can be done if the lambda terms are given as |Bruijn| values, as demonstrated in Figure \ref{ccc}. Without the Key monad, there seem to be no way to do the same for terms constructed with the PHoas terms.
 
-Our translation works by first translating |PHoas| to the |TExp| from the previous section, and then translating that to nested de bruijn indices. The first step in this translation is straightforwardly defined as follows: 
+Our translation works by first translating |PHoas| to the |KExp| from the previous subsection, and then translating that to nested de bruijn indices. The first step in this translation is straightforwardly defined as follows: 
 \begin{code}
-phoasToKey :: (forall v. PHoas v a) -> (forall s. KeyM (KExp s a))
+phoasToKey ::  (forall v. PHoas v a) -> 
+               (forall s. KeyM (KExp s a))
 phoasToKey t = go t where
   go :: PHoas (Key s) a -> KeyM s (KLam s a)
   go (PVar x)    = return (KVar x)
@@ -414,7 +503,7 @@ We will now show how we can create a function of type:
 \begin{code}
 keyToBruijn :: KExp s a -> Bruijn [] a
 \end{code}
-Using this function, we can then implement |phoas2nested| as follows:
+Using this function, we can then implement |phoasToBruijn| as follows:
 \begin{code}
 phoasToBruijn :: (forall v. PHoas v x) -> Bruijn [] x
 phoasToBruijn p = runKeyM 
@@ -450,7 +539,7 @@ instance PFunctor (FKeyMap s) where
   pfmap f (FKm m) = FKm (fmap (pfmap f) m)
 \end{code}
 
-We store the current ``enviroment'' as a |FKeyMap| mapping each |Key| to an |Index| in the current enviroment. When we enter a lambda-body, we need to extend the enviroment with a new name mapping to the ``de Bruijn index'' |HHead|, and add one lookup step to each other de Bruijn index currently in the |FKeyMap|. This is be done as follows:
+We store the current ``enviroment'' as a |FKeyMap| mapping each |Key| to an |Index| in the current enviroment. When we enter a lambda-body, we need to extend the enviroment with a new name mapping to the de Bruijn index |HHead|, and add one lookup step to each other de Bruijn index currently in the |FKeyMap|. This is be done as follows:
 \begin{code}
 extend :: Key s h -> FKeyMap s (Index t) ->
             FKeyMap s (Index (h : t))
@@ -506,9 +595,94 @@ instance PFunctor (TList l) where
 
 \end{figure}
 
-\section{Approximating the |Key| monad}
+\section{Safety of the |Key| monad}
 
-The |Key| monad seems to be a perfectly safe thing, but it seems that it is not expressible in Haskell directly.
+The |Key| monad seems to be a perfectly safe thing, but it seems that it is not expressible in Haskell directly. In this section, we argue informally for the safety of the |Key| monad and its implementation.
+
+A straightforward implementation of the Key monad creates a new globally unique key for each key. For example, an implemenation using a plethora of unsafe extensions is as follows: 
+\begin{code}
+newtype KeyM  s a = KeyM {getKeyM :: IO a }
+    deriving (Applicative, Functor)
+newtype Key   s a = Key Unique
+
+testEquality :: Key s a -> Key s b -> Maybe (a :~: b)
+testEquality (Key i) (Key j) 
+  | i == j     = Just (unsafeCoerce Refl)
+  | otherwise  = Nothing
+
+instance Monad (KeyM s) where
+  return x = KeyM (return x)
+  m >>= f  = KeyM $
+    do x <- unsafeInterleaveIO (getKeyM m)
+       f x
+  m >> n   = n
+
+newKey :: KeyM s (Key s a)
+newKey = KeyM newUnique
+
+runKeyM :: (forall s . KeyM s a) -> a
+runKeyM (KeyM m) = unsafePerformIO m
+\end{code}
+This implementation has the disturbing feature that it uses \emph{three} functions whose names have |unsafe| as a prefix. A state monad implementation to provide unique numbers and only uses |unsafeCoerce| is also possible, but does not fulfill the law |m >> n = n|, which is why |unsafeInterleaveIO| is needed. Although it initially looks shady, we believe that this implementation is safe. But what do we mean precisely, when we say ``safe''?
+
+\paragraph{Type safety}
+The first safety property that we conjecture the Key monad has is \emph{type safety}: |testEquality| will never allow us to proof |a :~: b| for two \emph{distinct} types. The informal agument is that each Key has one type associated with it, and a unique number, and hence if the numbers are the same the types must also be the same. The assumption that each Key has \emph{one} type associated with it is broken if we have  a (non-bottom) value of type |forall a. Key s a| for some specific |s|. This hypothetical value can be used to construct |unsafeCoerce :: a -> b| because it is a unique key for \emph{any} type. The argument why no non-bottom value of this type can be created by using the key monad is that we can only create new keys with |newKey| and the type |forall s. KeyM (forall a. Key s a)| does not unify with the type of |newKey|, namely |forall s a. KeyM (Key s a)|. For the same reason, it is also not possible to get polymorphic references, i.e. references of type |(forall a. IORef a)| in Haskell.
+
+\paragraph{Referential transparency} The second safety property that we are concerned with it \emph{referential transparency}: is |let x = y in (x,x)| still allways the same as |(y,y)| with the |Key| monad extension? This is where the universal quantification in |runKeyM| comes into play, which is not needed for type safety (assuming globally unique keys). Operationally, the expressions |let x = runKeyM m in (x,x)| and |(runKeyM m, runKeyM m)| are \emph{not} the same, the latter will produce twice the amount of new keys that the former produces. However, because the argument of |runKeyM| is universally qualified, we can be sure that the keys created in the computation cannot escape. We will hence never be able to \emph{observe} wether the keys in two calls to |runKeyM| are distinct or different: programs which attempt ot observe this are not type-correct. 
+
+\paragraph{Abstraction safety} 
+Abstraction safety is the property that we cannot break the abstraction barriers which are introduced through existential types. For example, if we have an existential type:
+\begin{code}
+data AbsBool where
+  AbsBool ::  Eq a => a -> a -> (a -> b -> b -> b) 
+              -> AbsBool
+\end{code}
+Which use in two ways:
+\begin{code}
+boolBool = 
+  AbsBool True False (\c t f -> if c then t else f) 
+boolInt  = 
+  AbsBool  0 1        (\c t f -> if c == 0 then t else f)
+\end{code}
+If our language is abstraction safe, then it is impossible to observe any difference between |boolBool| and |boolInt|. This property is formalized by \emph{parametricity} (which also gives ``free'' theorems). A typical example of a primitive which is not abstraction safe (but is type-safe) is a primitive that allows us to check the equality of any two types:
+\begin{code}
+badTest :: a -> b -> Maybe (a :~: b)
+\end{code}
+
+The primitive |testEquality| is similar to the |badTest| primitive above, and indeed our operations on |Box| do allow us to ``break the abstraction barrier: if |unlock| succeeds, we have learned which type is hidden in the |Box|. However, finding out which type is hidden by an existential type is can not only be done with the Key monad, but also by the established Generalized Algebraic Datatypes extension of Haskell. For example, suppose we have the following type:
+\begin{code}
+data IsType a where
+  IsBool  :: IsType Bool
+  IsInt   :: IsType Int
+  IsChar  :: IsType Char
+\end{code}
+We can then straightforwardly implement a variant of |testEquality|:
+\begin{code}
+testEquality :: IsType a -> IsType b -> Maybe (a :~: b)
+testEquality IsBool  IsBool  = Just Refl
+testEquality IsInt   IsInt   = Just Refl
+testEquality IsChar  IsChar  = Just Refl
+testEquality _       _       = Nothing
+\end{code}
+There are however formulations of parametricity which state more precisely exactly which abstraction barrier cannot be crossed\cite{type-safecast, bernardy_proofs_2012}, which still state that |boolBool| and |boolInt| are indistuingishable. The type |Key s|, for a specific |s|, can be thought of as a GADT:
+\begin{code}
+data Key s a where
+  Key0 :: Key s Int
+  Key1 :: Key s Bool
+  ...
+\end{code}
+A tricky bit here is that since a |Key| computation might create an infinite number of keys, this hypothetical datatype might have an infinite number of constructors. We conjecture that there is a variant of parametricity for Haskell extended the Key monad in which, like with GADTs, states that |boolBool| and |boolInt| above are indistuingishable. 
+
+\paragraph{Termination?}
+
+
+
+
+
+Why no indexed monad? Staticily known types (and number of types), same as declaring |Key| GADT above!
+
+
+
 
 \bibliographystyle{apalike}
 \bibliography{refs}
