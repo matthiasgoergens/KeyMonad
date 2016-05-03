@@ -619,13 +619,11 @@ instance Effect (KeyEff s) where
 newKey :: KeyEff s [a] (Key s a)
 runKeyEff :: (forall s. KeyEff s l a) -> a
 \end{code}
+The second type argument of |KeyEff| gives the list of the types of keys that are created within the |KeyEff| computation. Binding concatenates the two types of keys, and |newKey| is a |KeyEff| computation creating a single key.
 The full implementation of this inteface can be found at ... 
-While similar to the Key monad, this construction is \emph{less powerfull} than the regular key monad because the types of the keys which are going to be created must now be \emph{statically known}. All example use cases of the key monad rely on the fact that the type of the keys which are going to be created do not have to be statically know. For example, we cannot implement a translation from Parametric Hoas to de Bruijn indices with the Key parametric effect monad, because the type of the keys which will have to be created is precisely the information that a parametric HOAS representation lacks.
+While similar to the Key monad, this construction is \emph{less powerfull} than the regular key monad because the types of the keys which are going to be created must now be \emph{statically known}. All example use cases of the key monad in this paper rely on the fact that the type of the keys which are going to be created do not have to be statically know. For example, we cannot implement a translation from Parametric Hoas to de Bruijn indices with the Key parametric effect monad, because the type of the keys which will have to be created is precisely the information that a parametric HOAS representation lacks. 
 
- In this section, we argue informally for the safety of the |Key| monad and its implementation.
-
-newKey :: KeyIM 
-
+ In the rest of this section, we argue informally for the safety of the |Key| monad and its implementation.
 A straightforward implementation of the Key monad creates a new globally unique key for each key. For example, an implemenation using a plethora of unsafe extensions is as follows: 
 \begin{code}
 newtype KeyM  s a = KeyM {getKeyM :: IO a }
