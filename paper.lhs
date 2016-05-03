@@ -706,13 +706,6 @@ A tricky bit here is that since a |Key| computation might create an infinite num
 
 
 
-
-
-Why no indexed monad? Staticily known types (and number of types), same as declaring |Key| GADT above!
-
-
-
-
 \bibliographystyle{apalike}
 \bibliography{refs}
 
