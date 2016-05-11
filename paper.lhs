@@ -41,7 +41,9 @@
 \begin{document}
 \maketitle
 
-
+\newcommand{\atze}[1]{{\it Atze says: #1}}
+\newcommand{\koen}[1]{{\it Koen says: #1]}}
+\newcommand{\pablo}[1]{{\it [Pablo says: #1]}}
 
 \section{Introduction}
 
@@ -154,6 +156,18 @@ testEquality x y
 \end{code}
 Hence, another way to think of this paper is that we signal that the above function is \emph{safe}, and that this allows us to do things which we could not do before.
 
+\atze{Koen: you suggested this to be in this paper, but I don't know what it should show. Can you elaborate?}
+It \emph{is} possible to implement a similar, but weaker, version of |testEquality| using only the |ST| monad functions. If we have two references of types |STRef s (Maybe a)| and |STRef s (Maybe b)| then we can create a function that casts a value of type |a| to |STRef s (Maybe b|. The |Maybe| value in the |ST| monad is |Just| if both references where the same, and |Nothing| otherwise.
+\begin{code}
+convert :: STRef s (Maybe a) -> STRef s (Maybe b) -> 
+           a -> ST s (Maybe b)
+convert ra rb c = 
+  do  writeSTRef rb Nothing
+      writeSTRef ra (Just c)
+      readSTRef rb
+\end{code} 
+This implementation relies on the insight that the two references are actually the same reference, then writing to one reference must trigger a result in the other.
+
 \subsection{Key monad laws}
 
 The behavior of the Key monad is more precisely specified by the monad laws and the Key monad laws shown in Figure \ref{laws}. The |sameKey| and |distinctKey| laws describe the behavior of |testEquality|. The notation |E[x]| in these laws, means the expression |x| in an arbitrary expression context |E[]| (such that the free variables of |x| are not bound by |E[]|). 
@@ -164,25 +178,25 @@ The behavior of the Key monad is more precisely specified by the monad laws and 
 \begin{minipage}{0.42\columnwidth}
 \begin{code}
 do  k <- newKey 
-    E[testEquality k k]
+    f (testEquality k k)
 \end{code}
 \end{minipage}& |=| & \hspace{-0.5cm}\begin{minipage}{0.3\columnwidth}
 \begin{code}
 do  k <- newKey 
-    E[Just Refl]
+    f (Just Refl)
 \end{code}
 \end{minipage}& (|sameKey|) \\[-0.2cm]
 \begin{minipage}{0.42\columnwidth}
 \begin{code}
 do  k <- newKey 
     l <- newKey
-    E[testEquality k l]
+    f (testEquality k l)
 \end{code}
 \end{minipage}&  |=| & \hspace{-0.5cm}\begin{minipage}{0.3\columnwidth}
 \begin{code}
 do  k <- newKey 
     l <- newKey
-    E[Nothing]
+    f Nothing
 \end{code}
 \end{minipage}& (|distinctKey|) \\[-0.2cm] \begin{minipage}{0.22\columnwidth}
 \begin{code}
@@ -326,22 +340,22 @@ toCage k = Cage (\env -> env ! k)
 \end{code}
 We can introduce an environment from a single value, when given a name (|Key|) for that value: 
 \begin{code}
-introEnv :: Arrow a => Key s x -> a x (HMap s)
+introEnv :: Arrow a => Key s x -> a x (KeyMap s)
 introEnv k = arr (singleton k)
 \end{code}
 We also define an arrow to eliminate an environment, by interpreting an expression (|Cage|) using that environment:
 \begin{code}
-elimEnv ::  Cage s x -> a (HMap s) x
+elimEnv ::  Cage s x -> a (KeyMap s) x
 elimEnv c = arr (liberate c)
 \end{code}
 Next to introducing and eliminating environments, we also need to extend an environment and evaluate an expression while keeping the environment:
 \begin{code}
 extendEnv :: Arrow a =>  Key s x ->
-                         a (x, HMap s) (HMap s)
+                         a (x, KeyMap s) (KeyMap s)
 extendEnv k = arr (uncurry (insert k))
 
 withEnv :: Arrow a =>  Cage s x ->
-                       a (HMap s) (x, HMap s)
+                       a (KeyMap s) (x, KeyMap s)
 withEnv c = dup >>> first (elimEnv c)
     where dup = arr (\x -> (x,x))
 \end{code}
@@ -350,7 +364,7 @@ With these auxiliary arrows, we can define functions that convert back and forth
 \begin{code}
 toEnvA ::  Arrow a =>  
            Cage s x  -> Key s y   -> 
-           a x y -> a (HMap s) (HMap s)
+           a x y -> a (KeyMap s) (KeyMap s)
 toEnvA inC outK a  =
    withEnv inC >>> first a >>> extendEnv outK
 \end{code}
@@ -360,7 +374,7 @@ In the other direction, to implement |arrowize| we need to convert an arrow from
 \begin{code}
 fromEnvA ::  Arrow a =>
              Key s x   -> Cage s y  ->
-             a (HMap s) (HMap s) -> a x y
+             a (KeyMap s) (KeyMap s) -> a x y
 fromEnvA inK outC a  =
    introEnv inK >>> a >>> elimEnv outC
 \end{code}
@@ -411,18 +425,18 @@ data Exp   =  Var Name
 If we want to represent a \emph{typed} representation of the lambda calculus, then this approach does not work anymore. Consider the following GADT:
 \begin{code}
 data TExp a where
-  Var :: Name -> TExp a
-  Lam :: Name -> TExp b -> TExp (a -> b)
-  App :: TExp (a -> b) -> TExp a -> TExp b
+  Var  :: Name -> TExp a
+  Lam  :: Name -> TExp b -> TExp (a -> b)
+  App  :: TExp (a -> b) -> TExp a -> TExp b
 \end{code}
-We cannot do much with this datatype: if we, for example, want to write an interpreter, then there is no type-safe way to represent the enviroment: we need to map strings to different types.
+We cannot do much with this datatype: if we, for example, want to write an interpreter, then there is no type-safe way to represent the enviroment: we need to map names to different types, but there is no type-safe way to do so.
 
 With the |Key| monad, we \emph{can} extend this simple naming approach to typed representations. Consider the following data type:
 \begin{code}
 data KExp s a where
-  KVar :: Key s a -> KExp s a
-  KLam :: Key s a -> KExp s b -> KExp s (a -> b)
-  KApp :: KExp s (a -> b) -> KExp s a -> KExp s b
+  KVar  ::  Key s a -> KExp s a
+  KLam  ::  Key s a -> KExp s b -> KExp s (a -> b)
+  KApp  ::  KExp s (a -> b) -> KExp s a -> KExp s b
 \end{code}
 Because the names are now represented as keys, we can represented an enviroment as a |KeyMap|. We can even offer a Higher Order Abstract (HOAS) \cite{hoas} interface for constructing such terms by threading the key monad computation, which guarantees that all terms constructed with this interface are well-scoped:
 \begin{code}
@@ -451,9 +465,9 @@ The datatype |KExp| does not ensure that any value of type |KExp| is well-scoped
 In Parametric HOAS, typed lambda terms are represented by the following data type:
 \begin{code}
 data Phoas v a where
-  PVar :: v a -> Phoas v a
-  PLam :: (v a -> Phoas v b) -> Phoas v (a -> b)
-  PApp :: Phoas v (a -> b) -> Phoas v a -> PHoas b
+  PVar  :: v a -> Phoas v a
+  PLam  :: (v a -> Phoas v b) -> Phoas v (a -> b)
+  PApp  :: Phoas v (a -> b) -> Phoas v a -> PHoas b
 \end{code}
 The reading of the type parameter |v| is the type of \emph{variables}.
 For example, the lambda term |(\x y -> x)| can be constructed as follows:
@@ -461,9 +475,9 @@ For example, the lambda term |(\x y -> x)| can be constructed as follows:
 phoasExample :: Phoas v (x -> y -> x)
 phoasExample = PLam (\x -> PLam (\y -> x))
 \end{code}
-The attractive thing of Parametric HOAS is that we use Haskell binding to construct syntax, and that terms of type |(forall v. Phoas v a)| are always well-scoped\cite{phoas}.
+An attractive property of Parametric HOAS is that we use Haskell binding to construct syntax, and that terms of type |(forall v. Phoas v a)| are always well-scoped\cite{phoas}.
 
-The second way to ensure well-scopedness is to use typed de Bruijn indices. We present our own modern variant of this technique using Data Kinds and GADTs, but the idea is essentially the same as presented by Bird and Paterson \cite{nested} . Typed de Bruijn indices can represented as follows:
+The second way to ensure well-scopedness is to use typed de Bruijn indices. We present our own modern variant of this technique using Data Kinds and GADTs, but the idea is essentially the same as presented by Bird and Paterson \cite{nested}. Typed de Bruijn indices can represented as follows:
 \begin{code}
 data Index l a where
   HHead  :: Index (h : t) h
@@ -481,13 +495,13 @@ A closed term of type |a| has type |Bruijn [] a|.
 
 The types |(forall v. PHoas v a)| and |(Bruijn [] a)| both represent well-scoped typed lambda terms (and |undefined|), and translating from the latter to the former is straightforward. However, there seems to be no way to translate the former to the latter, without using extensions such as the |Key| monad. In other words there seems to be no function of type:
 \begin{code}
-phoasToBruijn :: (forall v. PHoas v a) -> NSyn [] a
+phoasToBruijn :: (forall v. PHoas v a) -> Bruijn [] a
 \end{code} 
-This seems to be not only be impossible in Haskell without extensions, but in dependently typed languages without extensions as well. When using |PHoas| in \emph{Coq} to prove properties about programming languages, an small extension to the logic in the form of a special well-formedness axiom for the |PHoas| datatype is needed to translate PHoas to de Bruijn indices\cite{phoas}. The |Key| monad is a general extension, which allows us to implement |phoasToBruijn|.
+This seems to be not only be impossible in Haskell without extensions, but in dependently typed languages without extensions as well. When using |PHoas| in \emph{Coq} to prove properties about programming languages, an small extension to the logic in the form of a special well-scopedness axiom for the |PHoas| datatype is needed to translate PHoas to de Bruijn indices\cite{phoas}.
 
 The well-scopedness of variables in a |Bruijn| value follows from the fact that the value is well-typed. With |PHoas|, the well-scopedness relies on the meta-level (i.e. not formalized through types) argument that no well-scoped values can be created by using the |PHoas| interface. The internal (i.e. formalized through types) well-scopedness of |Bruijn|, allows interpretations of syntax which seem to not be possible if we are using terms constructed with |PHoas|. As an example of this, consider translating lambda terms to \emph{cartesian closed category} combinators (the categorical version of the lambda calculus). This can be done if the lambda terms are given as |Bruijn| values, as demonstrated in Figure \ref{ccc}. Without the Key monad, there seem to be no way to do the same for terms constructed with the PHoas terms.
 
-Our translation works by first translating |PHoas| to the |KExp| from the previous subsection, and then translating that to typed de bruijn indices. The first step in this translation is straightforwardly defined as follows: 
+The |Key| monad allows us to implement |phoasToBruijn|. This translation works by first translating |PHoas| to the |KExp| from the previous subsection, and then translating that to typed de bruijn indices. The first step in this translation is straightforwardly defined as follows: 
 \begin{code}
 phoasToKey ::  (forall v. PHoas v a) -> 
                (forall s. KeyM (KExp s a))
@@ -546,7 +560,7 @@ extend :: Key s h -> FKeyMap s (Index t) ->
             FKeyMap s (Index (h : t))
 extend k m = insert k HHead (pfmap HTail m)
 \end{code}
-With this machinery in place, we can translate |KeyLam| to |NSyn| as follows:
+With this machinery in place, we can translate |KExp| to |Bruijn| as follows:
 \begin{code}
 keyToBruijn :: KExp s a -> Bruijn [] a
 keyToBruijn = go empty where
@@ -555,7 +569,8 @@ keyToBruijn = go empty where
   go e (KLam k b) = NLam (go (extend k e) b)
   go e (KApp f x) = NApp (go e f) (go e x)
 \end{code}
-Notice that this translation may fail if we lookup a key in the enviroment which does not exists, but that this cannot happen if the |KExp| value is well-scoped, which is always the case when we translate |PHoas| to |KExp|.
+
+Note that |keyToBruijn| fails if the input |KExp| is ill-scoped. This will never happen when |keyToBruijn| is called from |phoasToBruijn| because |phoasToKey| will always give well-scoped values of type |KExp|. This relies on the meta-level argument that values of type |PHoas| are always well-scoped. We stress that hence the key monad extension \emph{cannot} serve as a replacement of well-scopedness axiom used in a dependently typed setting. 
 
 
 
@@ -566,7 +581,7 @@ Notice that this translation may fail if we lookup a key in the enviroment which
 \begin{code}
 toClosed :: CCC c => Bruijn [] (x -> y) -> c () (x -> y)
 toClosed p = go p TNil where
-  go :: CCC c => NSyn l y -> TList l (c x) -> c x y
+  go :: CCC c => Bruijn l y -> TList l (c x) -> c x y
   go (BVar x)    e = findex e x
   go (BLam b)    e = curry $
                     go b (TCons snd (tmap (. fst) e))
