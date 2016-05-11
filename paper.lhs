@@ -670,7 +670,7 @@ The first safety property that we conjecture the Key monad has is \emph{type saf
 
 \paragraph{Referential transparency} The second safety property that we are concerned with is \emph{referential transparency}: more specifically does the following still hold with the key monad extension:
 \begin{code}
-let x = y in (x,x) ==  (y,y) 
+let x = e in (x,x) ==  (e,e) 
 \end{code}
 This is where the universal quantification in |runKeyM| comes into play, which is not needed for type safety (assuming globally unique keys). Operationally, the expressions |let x = runKeyM m in (x,x)| and |(runKeyM m, runKeyM m)| are \emph{not} the same, the latter will produce twice the amount of new keys that the former produces. However, because the argument of |runKeyM| is universally qualified, we can be sure that the keys created in the computation cannot escape. We will hence never be able to \emph{observe} wether the keys in two calls to |runKeyM| are distinct or different: programs which attempt to observe this are not type-correct. 
 
