@@ -402,7 +402,7 @@ proc f = runKeyM $
           return (fromEnvA inK a outC)
 \end{code} 
 
-Notice that while with this construction we can construct arrows with a monadic interface, instead of proc notation, this does \emph{not} mean that arrows are a special case of monads. Arrows are a generalization of monads\cite{arrows}, but there is another generalization of monads called \emph{relative monads}, which is a generalization of both arrows and monads\cite{relmonad}. Because all operations in the monad |ArrowSyn|, namely |(-<)|, give value of type |Cage s a| instead of a ``bare'' value of type |a|, our construction is actually a relative monad, but we use a trick\cite{bjorn} to make this into a monad.
+A similar construction is presented by Altenkirch \cite{relmonad} who shows that ... Arrows are a generalization of monads\cite{arrows}, but there is another generalization of monads called \emph{relative monads}, which is a generalization of both arrows and monads\cite{relmonad}. Because all operations in the monad |ArrowSyn|, namely |(-<)|, give value of type |Cage s a| instead of a ``bare'' value of type |a|, our construction is actually a relative monad, but we use a trick\cite{bjorn} to make this into a monad.
 
 
 
@@ -477,13 +477,7 @@ phoasExample = PLam (\x -> PLam (\y -> x))
 \end{code}
 An attractive property of Parametric HOAS is that we use Haskell binding to construct syntax, and that terms of type |(forall v. Phoas v a)| are always well-scoped\cite{phoas}.
 
-The second way to ensure well-scopedness is to use typed de Bruijn indices. We present our own modern variant of this technique using Data Kinds and GADTs, but the idea is essentially the same as presented by Bird and Paterson \cite{nested}. Typed de Bruijn indices can represented as follows:
-\begin{code}
-data Index l a where
-  HHead  :: Index (h : t) h
-  HTail  :: Index t x -> Index (h : t) x
-\end{code}
-Here |l| is a type-level list representing the types in the enviroment, and an |Index l a| is a de Bruijn index in such an enviroment, of type |a|. We can use this insight to represent lambda terms as follows:
+The second way to ensure well-scopedness is to use typed de Bruijn indices. We present our own modern variant of this technique using Data Kinds and GADTs, but the idea is essentially the same as presented by Bird and Paterson \cite{nested}. Our representation of typed de Bruijn indices is an index in a hetrogenous list. In Figure \ref{hetero} we show definitions for heterogenous lists and indicices in them. A typed de Bruijn index of type |Index l a| is an index for a variable of type |a| in an enviroment where the types of the variables are represented by the type level list |l|. We can use these indices to represent lambda terms as follows:
 \begin{code}
 data Bruijn l a where
   BVar  :: Index l a -> Bruijn l a
@@ -492,7 +486,27 @@ data Bruijn l a where
 \end{code}
 A closed term of type |a| has type |Bruijn [] a|.
 
+\begin{figure}
+\begin{code}
+data Index l a where
+  Head  :: Index (h : t) h
+  Tail  :: Index t x -> Index (h : t) x
 
+data TList f l where
+  TNil  :: TList f [] 
+  (:::) :: f h -> TList f t -> TList f (h : t)
+
+index :: TList f l -> Index l a -> f a
+index (h ::: _) Head     = h
+index (_ ::: t) (Tail i) = index t i
+
+pfmap :: (forall x. f x -> g x) -> TList f l -> TList g l
+pfmap f TNil      = TNil
+pfmap f (h ::: t) = f h ::: pfmap f t
+\end{code}
+\caption{Heterogenous list and indexes in them.}
+\ref{hetero}
+\end{figure}
 The types |(forall v. PHoas v a)| and |(Bruijn [] a)| both represent well-scoped typed lambda terms (and |undefined|), and translating from the latter to the former is straightforward. However, there seems to be no way to translate the former to the latter, without using extensions such as the |Key| monad. In other words there seems to be no function of type:
 \begin{code}
 phoasToBruijn :: (forall v. PHoas v a) -> Bruijn [] a
@@ -537,11 +551,8 @@ funlock k (FLock k' x) =
 \end{code}
 The difference with |Box| is that we now store values of type |f a| instead of values of type |a| in the box. We can provide a variant of |fmap| for this container:
 \begin{code}
-class PFunctor p where
-  pfmap :: (forall x. f x -> g x) -> p f -> p g
-
-instance PFunctor (FBox s) where
-  pfmap f (FLock k x) = FLock k (f x)
+pfmap :: (forall x. f x -> g x) -> p f -> p g
+pfmap f (FLock k x) = FLock k (f x)
 \end{code} We also need a variant of the |KeyMap|, where we store |FBox|es instead of regular boxes:
 \begin{code}
 newtype FKeyMap s f = FKm [FBox s f]
@@ -582,9 +593,9 @@ Note that |keyToBruijn| fails if the input |KExp| is ill-scoped. This will never
 toClosed :: CCC c => Bruijn [] (x -> y) -> c () (x -> y)
 toClosed p = go p TNil where
   go :: CCC c => Bruijn l y -> TList l (c x) -> c x y
-  go (BVar x)    e = findex e x
-  go (BLam b)    e = curry $
-                    go b (TCons snd (tmap (. fst) e))
+  go (BVar x)    e = index e x
+  go (BLam b)    e = 
+    curry $ go b (snd ::: pfmap (. fst) e)
   go (BApp f x)  e = uncurry (go f e) . prod id (go x e)
 
 class Category c => CCC c where
@@ -593,50 +604,130 @@ class Category c => CCC c where
     snd      :: c (a,b) b
     curry    :: c (a,b) x -> c a (b -> x)
     uncurry  :: c a (b -> x) -> c (a,b) x
-
-data TList l f where
-  TNil   :: TList [] f
-  TCons  :: f h -> TList t f -> TList (h : t) f
-
-tindex :: TList l f -> Index l x -> f x
-tindex (TCons h _) HHead     = h
-tindex (TCons _ t) (HTail i) = tindex t i
-
-instance PFunctor (TList l) where
-  pfmap f TNil        = TNil
-  pfmap f (TCons h t) = TCons (f h) (tmap f t)
 \end{code}
 \label{ccc}
 \caption{Translating lambda terms to cartesian closed categories.}
 
 \end{figure}
 
+\section{The Key monad in Haskell?}
+
+The |Key| monad seems to be a perfectly safe thing, but it seems that it is not expressible in Haskell directly. It \emph{is} however, possible to implement a similar but \emph{weaker} construction. In this section, we show the implementation of this weaker construction and discuss its difference with the Key monad. This motivates our claim that it is unlikely that the |Key| monad is not implementable in Haskell.
+
+A first insight is that it \emph{is} possible to implement to compare two indices in a heterogenous list, and produce a proof that their types are equal if their values are equal. This is can be done as follows:
+\begin{code}
+testEquality :: Index l a -> Index l b -> Maybe (a :~: b)
+testEquality Head      Head      = Just Refl
+testEquality (Tail l)  (Tail r)  = testEquality l r
+testEquality _         _         = Nothing
+\end{code}
+
+Using hetrogenous indices as |Key|s, we can then implement what we call the \emph{indexed} |Key| monad, where each computation carries an extra type parameter describing the types of the keys that are going to be created in the computation.
+\begin{code}
+type Key = Index
+data KeyIm s l a = 
+   KeyIm { getKeyIm :: TList (Key s) l -> a }
+
+ireturn :: a -> KeyIM s [] a
+ireturn x = KeyIM $ \_ -> x
+
+newKey :: KeyIM s [a] (Key s a) 
+newKey = KeyIM $ \(h ::: _) -> h
+\end{code}
+The type argument |l| gives the types of the keys that are going to be created. The argument to the constructor |KeyIm| is a function that given a heterogenous list of |Key|s of the right types, produces a result of type |a|. The implementation of |newKey| takes the key from the (singleton) hetrogenous list.
+
+How can we create such a list of keys? For this we want to create a heterogenous list of indices in a heterogenous list. For a regular list of length |n|, the list of valid indices in that list is |[0..n-1]|. For a heterogenous list of type |TList f [a,b,c]|, the heterogenous list of valid indices in that list is: \begin{code} Head ::: Tail Head ::: Tail (Tail Head) ::: TNil\end{code} To create such heterogenous lists of indices, we employ the following type class:
+\begin{code}
+class MakeIndices (l :: [*]) where
+  makeIndices :: TList (Index l) l
+instance MakeIndices [] where 
+  makeIndices = TNil
+instance MakeIndices (h : t) where
+  makeIndices = Head ::: pfmap Tail makeIndices
+\end{code}
+In the |h:t| case, we obtain a heterogenous list of indices for the tail and |pfmap Tail| on this list to make it into indices into |h:t| and prepend it with an index for the head of the list.
+
+
+Using this construction, we can implement running a key computation as follows:
+\begin{code}
+runKeyIm :: MakeIndices l => (forall s. KeyIm s l a) -> a
+runKeyIm m = getKeyIm m makeKeys
+\end{code}
+This works by first converting the type |forall s. KeyIm s l a| to |KeyIm l l a| and then constructing the indicices in the type-level list |l|. For a key computation of type |KeyIm s l a|, |l| is the list of types of the keys it creates, and |s| can be thought of as the list of types that the \emph{context} of creates. For instance, |newKey| creates a single key, but can be embedded into any context |s|. When we finally run a key computation, we state that the context is the is the computation itself and hence convert |forall s. KeyIm s l a| to |KeyIm l l a|.
+
+To implement bind (|.>>=|) we need to be able to split the list of keys we obtain to pass the appropriate part to the left and right parts of the computation. For this, we use the following type class:
+\begin{code}
+class Split l where
+  split :: TList f (l .++ r) -> (TList f l, TList f r)
+instance Split [] where
+  split r    = (TNil, r)
+instance Split t => Split (h : t) where
+  split (h ::: t) = let (l,r) = split t
+                    in (h ::: l, r)
+\end{code}
+Where |.++| is |++| on type level lists, implemented via closed type families in the obvious way. Using this splitting machinery, we can implement bind as follows:
+\begin{code}
+(.>>=) :: Split l =>  KeyIM s l a -> (a -> KeyIM s r b) -> 
+                      KeyIM s (l .++ r) b
+m .>>= f = KeyIM $ \t ->  let  (lk,rk) = split t
+                               x = runKeyIM m lk
+                          in runKeyIM (f x) rk
+\end{code}
+
+
+While similar to the Key monad, this construction is \emph{less powerfull} than the regular key monad because the types of the keys which are going to be created must now be \emph{statically known}. All example use cases of the key monad in this paper rely on the fact that the type of the keys which are going to be created do not have to be statically know. For example, we cannot implement a translation from Parametric Hoas to de Bruijn indices with |KeyIm|, because the type of the keys which will have to be created is precisely the information that a parametric HOAS representation lacks. 
+
+It might seem possible to implement the |Key| monad by using an existential type to hide the types which are created in the rest of the computation. 
+\begin{code}
+type KeyM s a = exists l. KeyIm s l a
+\end{code}
+For presentational purposes, we use a hypothetical notation for existential types.
+However, the implementations of |runKeyM| and |join| then fail to type-check. The problem with |runKeyM| is then that the argument is of type |forall s. exists l. KeyIm s l a|, which we want to transform to |exists l. KeyIm l l a|. However, this transformation does not type-check:
+\begin{code}
+forall s. exists l. p s l /= exists l. forall s. p s l
+\end{code}
+For join, a similar problem arises the argument of join is of type:
+\begin{code}
+exists l1. KeyIm s l1 (exists l2. KeyIM s l2 a) 
+\end{code}
+Unwrapping the definition of |KeyIm| this becomes:
+\begin{code}
+exists l1. TList (Key s) l1 -> exists l2. TList (Key s) l2 -> a
+\end{code}
+We could easily implement bind if we could transform this to:
+\begin{code}
+exists l1 l2. TList (Key s) l1 -> TList (Key s) l2 -> a
+\end{code}
+However, this is not an equivalent type:
+\begin{code}
+a -> exists l2. b /= exists l2. a -> b
+\end{code}
+An implementation of the |Key| monad in Haskell would have to overcome these hurdles.
+
+
+
+
+
+
+
+
 \section{Safety of the |Key| monad}
 
 \subsection{Why adding extra types is not good enough}
 
-The |Key| monad seems to be a perfectly safe thing, but it seems that it is not expressible in Haskell directly. It \emph{is} however, possible to implement a similar but weaker construction, which involves an extra type parameter that indicates the type of keys created in a computation. More precisely, this construction is not a monad, but an instance of the following type class, called the \emph{parametric effect monad} \cite{peff}:
-\begin{code}
-class Effect m where
-   type Unit m :: k
-   type Plus m :: k -> k -> k
-   ireturn :: a -> m (Unit m) a
-   (.>>=) :: m f a -> (a -> m g b) -> m (Plus m f g) b
-\end{code}
-The Key parametric effect monad then has the following interface:
-\begin{code}
-data KeyEff s l a 
-instance Effect (KeyEff s) where
-  type Unit (KeyEff s) = []
-  type Plus (KeyEff s) = (++)
-  ...
 
+
+\begin{code}
 newKey :: KeyEff s [a] (Key s a)
 runKeyEff :: (forall s. KeyEff s l a) -> a
 \end{code}
+
+
+
 The second type argument of |KeyEff| gives the list of the types of keys that are created within the |KeyEff| computation. Binding concatenates the two types of keys, and |newKey| is a |KeyEff| computation creating a single key.
-The full implementation of this inteface can be found at ... 
-While similar to the Key monad, this construction is \emph{less powerfull} than the regular key monad because the types of the keys which are going to be created must now be \emph{statically known}. All example use cases of the key monad in this paper rely on the fact that the type of the keys which are going to be created do not have to be statically know. For example, we cannot implement a translation from Parametric Hoas to de Bruijn indices with the Key parametric effect monad, because the type of the keys which will have to be created is precisely the information that a parametric HOAS representation lacks. 
+
+
+
 
  In the rest of this section, we argue informally for the safety of the |Key| monad and its implementation.
 A straightforward implementation of the Key monad creates a new globally unique key for each key. For example, an implemenation using a plethora of unsafe extensions is as follows: 
@@ -666,13 +757,13 @@ runKeyM (KeyM m) = unsafePerformIO m
 This implementation has the disturbing feature that it uses \emph{three} functions whose names have |unsafe| as a prefix. A state monad implementation to provide unique numbers and only uses |unsafeCoerce| is also possible, but does not fulfill the law |m >> n = n|, which is why |unsafeInterleaveIO| is needed. Although it initially looks shady, we believe that this implementation is safe. But what do we mean precisely, when we say ``safe''?
 
 \paragraph{Type safety}
-The first safety property that we conjecture the Key monad has is \emph{type safety}: |testEquality| will never allow us to proof |a :~: b| for two \emph{distinct} types. The informal agument is that each Key has one type associated with it, and a unique number, and hence if the numbers are the same the types must also be the same. The assumption that each Key has \emph{one} type associated with it is broken if we have  a (non-bottom) value of type |forall a. Key s a| for some specific |s|. This hypothetical value can be used to construct |unsafeCoerce :: a -> b| because it is a unique key for \emph{any} type. The argument why no non-bottom value of this type can be created by using the key monad is that we can only create new keys with |newKey| and the type |forall s. KeyM (forall a. Key s a)| does not unify with the type of |newKey|, namely |forall s a. KeyM (Key s a)|. For the same reason, it is also not possible to get polymorphic references, i.e. references of type |(forall a. IORef a)| in Haskell.
+The first safety property that we conjecture the Key monad has is \emph{type safety}: |testEquality| will never allow us to proof |a :~: b| for two \emph{distinct} types. The informal agument is that each Key has one type associated with it, and a unique number, and hence if the numbers are the same the types must also be the same. The assumption that each Key has \emph{one} type associated with it is broken if we have  a (non-bottom) value of type |forall a. Key s a| for some specific |s|. This hypothetical value can be used to construct |unsafeCoerce :: a -> b| because it is a unique key for \emph{any} type. The argument why no non-bottom value of this type can be created by using the key monad is that we can only create new keys with |newKey| and the type |forall s. KeyM (forall a. Key s a)| does not unify with the type of |newKey|, namely |forall s a. KeyM (Key s a)|. For the same reason, it is also not possible to get polymorphic references, i.e. references of type |(forall a. IORef a)| in Haskell. Moreover, if the type of |runKeyM| is also crucial for type-safety. If its type was |KeyM s a -> a| instead of |(forall s. KeyM s a) -> a| we could create a polymorphic key with |runKeyM newKey :: forall a. Key s a|.
 
 \paragraph{Referential transparency} The second safety property that we are concerned with is \emph{referential transparency}: more specifically does the following still hold with the key monad extension:
 \begin{code}
 let x = e in (x,x) ==  (e,e) 
 \end{code}
-This is where the universal quantification in |runKeyM| comes into play, which is not needed for type safety (assuming globally unique keys). Operationally, the expressions |let x = runKeyM m in (x,x)| and |(runKeyM m, runKeyM m)| are \emph{not} the same, the latter will produce twice the amount of new keys that the former produces. However, because the argument of |runKeyM| is universally qualified, we can be sure that the keys created in the computation cannot escape. We will hence never be able to \emph{observe} wether the keys in two calls to |runKeyM| are distinct or different: programs which attempt to observe this are not type-correct. 
+For referential transparency, the universal quantification in |runKeyM| is key. Operationally, the expressions |let x = runKeyM m in (x,x)| and |(runKeyM m, runKeyM m)| are \emph{not} the same, the latter will produce twice the amount of new keys that the former produces. However, because the argument of |runKeyM| is universally qualified, we can be sure that the keys created in the computation cannot escape. We will hence never be able to \emph{observe} wether the keys in two calls to |runKeyM| are distinct or different: programs which attempt to observe this are not type-correct. 
 
 \paragraph{Abstraction safety} 
 Abstraction safety is the property that we cannot break the abstraction barriers which are introduced through existential types. For example, if we have an existential type:
