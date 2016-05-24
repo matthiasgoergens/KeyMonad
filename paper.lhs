@@ -37,13 +37,13 @@
 %format uncurryn = "\mathit{uncurry}_n"
 \title{Dynamic typing, Unconstrained!}
 \authorinfo{Koen Claessen, Pablo Buiras, Atze van der Ploeg}{Chalmers University of Technology}
-           {atze@@chalmers.se}
+           {\{koen, buiras, atze\}@@chalmers.se}
 \begin{document}
 \maketitle
 
 \newcommand{\atze}[1]{{\it Atze says: #1}}
-\newcommand{\koen}[1]{{\it Koen says: #1]}}
-\newcommand{\pablo}[1]{{\it [Pablo says: #1]}}
+\newcommand{\koen}[1]{{\it Koen says: #1}}
+\newcommand{\pablo}[1]{{\it Pablo says: #1}}
 
 \section{Introduction}
 
@@ -60,15 +60,12 @@ type Key
 type KeyM
 
 instance Monad (KeyM s)
-
-newKey :: KeyM s (Key s a)
-
-testEquality :: KeyM s a -> Key s b -> Maybe (a :~: b)
+newKey        :: KeyM s (Key s a)
+testEquality  :: Key s a -> Key s b -> Maybe (a :~: b)
+runKeyM       :: (forall s. KeyM s a) -> a
 
 data a :~: b where
   Refl :: a :~: a
-
-runKeyM :: (forall s. KeyM s a) -> a
 \end{code}
 \caption{The Key monad interface}
 \label{interface}
