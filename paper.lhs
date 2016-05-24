@@ -681,12 +681,12 @@ It might seem possible to implement the |Key| monad by using an existential type
 \begin{code}
 type KeyM s a = exists l. KeyIm s l a
 \end{code}
-For presentational purposes, we use a hypothetical notation for existential types.
-However, the implementations of |runKeyM| and |join| then fail to type-check. The problem with |runKeyM| is then that the argument is of type |forall s. exists l. KeyIm s l a|, which we want to transform to |exists l. KeyIm l l a|. However, this transformation does not type-check:
+For presentational purposes, we use a hypothetical notation for existential types and ignore the |Split| and |MakeKeys| constraints in this discussion.
+With the above type, the implementations of |runKeyM| and |join| then fail to type-check. The problem with |runKeyM| is then that the argument is of type |forall s. exists l. KeyIm s l a|, which we want to transform to |exists l. KeyIm l l a|. However, this transformation does not type-check:
 \begin{code}
 forall s. exists l. p s l /= exists l. forall s. p s l
 \end{code}
-For join, a similar problem arises the argument of join is of type:
+For join, a similar problem arises. The argument of join is of type:
 \begin{code}
 exists l1. KeyIm s l1 (exists l2. KeyIM s l2 a) 
 \end{code}
