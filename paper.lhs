@@ -18,12 +18,15 @@
 \newcommand{\aplus}{\mathbin{<\!\!\!\!\mkern1.4mu +\mkern1.4mu\!\!\!\!>}}
 \newcommand{\fmap}{\mathbin{<\!\!\!\mkern-0.4mu\raisebox{0.0pt}{\scalebox{0.8}{\$}}\mkern-0.4mu\!\!\!>}}
 %format :~: =  ":\sim:"
+%format :*: =  ":\!\!\times\!\!:"
+%format `Sub` = "\subseteq"
 %format forall = "\forall"
 %format . = ".\:"
 %format >>> = "\mathbin{>\!\!\!>\!\!\!>}"
 %format .>>= = "\cdot\!\!\!\bind"
 %format .>> = "\cdot\!\!>\!\!\!>"
 %format -< = "\prec"
+%format Left = "\prec"
 %format >- = "\succ"
 %format :. = "\circ"
 %format procb = "\mathbf{proc}"
@@ -303,7 +306,8 @@ Informally, a |Cage| ``contains'' a value of type |x|, but in reality it does no
 
 By using |(-<)| and the monad interface, we can construct the syntax for the arrow computation that we are expressing. Afterwards, we use the following function to convert the syntax to an arrow:
 \begin{code}
-proc ::  Arrow a => (forall s. Cage s x -> ArrowSyn a s y) 
+proc ::  Arrow a => 
+         (forall s. Cage s x -> ArrowSyn a s (Cage s y)) 
          -> a x y
 \end{code}
 
@@ -367,7 +371,7 @@ toEnvA inC outK a  =
 \end{code}
 We first produce the input to the argument arrow, by interpreting the input expression using the input environment. We then execute the arguments arrow, and bind its output to the given name to obtain the output environment.
 
-In the other direction, to implement |arrowize| we need to convert an arrow from environment to environment back to an arrow of type |x| to type |y|, for which we instead need the name of the input and an expression for the output:
+In the other direction, to implement |proc| we need to convert an arrow from environment to environment back to an arrow of type |x| to type |y|, for which we instead need the name of the input and an expression for the output:
 \begin{code}
 fromEnvA ::  Arrow a =>
              Key s x   -> Cage s y  ->
@@ -399,7 +403,25 @@ proc f = runKeyM $
           return (fromEnvA inK a outC)
 \end{code} 
 
-A similar construction is presented by Altenkirch \cite{relmonad} who shows that ... Arrows are a generalization of monads\cite{arrows}, but there is another generalization of monads called \emph{relative monads}, which is a generalization of both arrows and monads\cite{relmonad}. Because all operations in the monad |ArrowSyn|, namely |(-<)|, give value of type |Cage s a| instead of a ``bare'' value of type |a|, our construction is actually a relative monad, but we use a trick\cite{bjorn} to make this into a monad.
+Because all the operations in the |ArrowSyn| return the type |Cage s|, it not possible to use observe the output of an arrow computation to decide what to do next. While we cannot decide what to do next based on the output of a computation of type |ArrowSyn s (Cage s x)|, we can, for example, decide what to next based on the outcome of a computation of type |ArrowSyn s Int|. This does not give our embedded arrow notation more power than regular arrow notation: because each primitive operation returns something of type |Cage s a|, the value of the integer cannot depend on the result of an arrow computation. This essentially the same trick as described in Svenningsson and Svensson\cite{bjorn}.
+
+While the above construction is a monad, it is also possible to make a simillar construction for arrows which is a \emph{relative monad}\cite{relmonad}. A relative monad is an instance of the following type class:
+\begin{code}
+class RelMonad m v where
+  rreturn :: v x -> m x
+  (.>>=)  :: m x -> (v x -> m y) -> m y
+\end{code}
+The only difference with the regular monad type class is that the values are now wrapped in a type constructor |v|. Relative monads are a generalization of monads, because each monad can be made a relative monad by setting |v| to |Id|. 
+We can construct a similar construction as |ArrowSyn| as follows:
+\begin{code}
+data ArrowRm a s x = ArrowRm 
+         (ArrowSyn a s (Cage s x))
+instance RelMonad (ArrowRm a s) (Cage s) where ...
+\end{code}
+
+Altenkrich\cite{relmonad} shows that in category theory arrows are a special case of relative monads, but his construction is not a relative monad in Haskell. In particular 
+his definition of bind does not allow us freely use bound values, instead it requires us to manually lift values into scope, in the same fashion as directly using de Bruijn indices. Our construction suggests that arrows are also a special case of relative monad in Haskell with the key monad, but a formal proof is outside the scope of this paper.
+
 
 
 
@@ -426,7 +448,7 @@ data TExp a where
   Lam  :: Name -> TExp b -> TExp (a -> b)
   App  :: TExp (a -> b) -> TExp a -> TExp b
 \end{code}
-We cannot do much with this datatype: if we, for example, want to write an interpreter, then there is no type-safe way to represent the enviroment: we need to map names to different types, but there is no type-safe way to do so.
+We cannot do much with this datatype: if we, for example, want to write an interpreter, then there is no type-safe way to represent the enviroment: we need to map names to values of different types, but there is no type-safe way to do so.
 
 With the |Key| monad, we \emph{can} extend this simple naming approach to typed representations. Consider the following data type:
 \begin{code}
@@ -474,7 +496,7 @@ phoasExample = PLam (\x -> PLam (\y -> x))
 \end{code}
 An attractive property of Parametric HOAS is that we use Haskell binding to construct syntax, and that terms of type |(forall v. Phoas v a)| are always well-scoped\cite{phoas}.
 
-The second way to ensure well-scopedness is to use typed de Bruijn indices. We present our own modern variant of this technique using Data Kinds and GADTs, but the idea is essentially the same as presented by Bird and Paterson \cite{nested}. Our representation of typed de Bruijn indices is an index in a hetrogenous list. In Figure \ref{hetero} we show definitions for heterogenous lists and indicices in them. A typed de Bruijn index of type |Index l a| is an index for a variable of type |a| in an enviroment where the types of the variables are represented by the type level list |l|. We can use these indices to represent lambda terms as follows:
+The second way to ensure well-scopedness is to use typed de Bruijn indices. We present our own modern variant of this technique using Data Kinds and GADTs, but the idea is essentially the same as presented by Bird and Paterson \cite{nested}. Our representation of typed de Bruijn indices is an index in a hetrogenous list. In Figure \ref{heteros} we show definitions for heterogenous lists and indicices in them. A typed de Bruijn index of type |Index l a| is an index for a variable of type |a| in an enviroment where the types of the variables are represented by the type level list |l|. We can use these indices to represent lambda terms as follows:
 \begin{code}
 data Bruijn l a where
   BVar  :: Index l a -> Bruijn l a
@@ -497,13 +519,14 @@ index :: TList f l -> Index l a -> f a
 index (h ::: _) Head     = h
 index (_ ::: t) (Tail i) = index t i
 
-pfmap :: (forall x. f x -> g x) -> TList f l -> TList g l
-pfmap f TNil      = TNil
-pfmap f (h ::: t) = f h ::: pfmap f t
+pfmapl :: (forall x. f x -> g x) -> TList f l -> TList g l
+pfmapl f TNil      = TNil
+pfmapl f (h ::: t) = f h ::: pfmapl f t
 \end{code}
 \caption{Heterogenous list and indexes in them.}
-\ref{hetero}
+\label{heteros}
 \end{figure}
+
 The types |(forall v. PHoas v a)| and |(Bruijn [] a)| both represent well-scoped typed lambda terms (and |undefined|), and translating from the latter to the former is straightforward. However, there seems to be no way to translate the former to the latter, without using extensions such as the |Key| monad. In other words there seems to be no function of type:
 \begin{code}
 phoasToBruijn :: (forall v. PHoas v a) -> Bruijn [] a
@@ -558,15 +581,16 @@ lookup :: Key s a -> FKeyMap s f -> Maybe (f a)
 \end{code}
 We also provide an instance for |PFunctor| for this datatype:
 \begin{code}
-instance PFunctor (FKeyMap s) where
-  pfmap f (FKm m) = FKm (fmap (pfmap f) m)
+pfmapkm :: (forall x. f x -> g x) -> 
+           FKeyMap s f -> FKeyMap s g
+pfmapkm f (FKm m) = FKm (fmap (pfmap f) m)
 \end{code}
 
 We store the current ``enviroment'' as a |FKeyMap| mapping each |Key| to an |Index| in the current enviroment. When we enter a lambda-body, we need to extend the enviroment with a new name mapping to the de Bruijn index |HHead|, and add one lookup step to each other de Bruijn index currently in the |FKeyMap|. This is be done as follows:
 \begin{code}
 extend :: Key s h -> FKeyMap s (Index t) ->
             FKeyMap s (Index (h : t))
-extend k m = insert k HHead (pfmap HTail m)
+extend k m = insert k HHead (pfmapkm HTail m)
 \end{code}
 With this machinery in place, we can translate |KExp| to |Bruijn| as follows:
 \begin{code}
@@ -592,7 +616,7 @@ toClosed p = go p TNil where
   go :: CCC c => Bruijn l y -> TList l (c x) -> c x y
   go (BVar x)    e = index e x
   go (BLam b)    e = 
-    curry $ go b (snd ::: pfmap (. fst) e)
+    curry $ go b (snd ::: pfmapl (. fst) e)
   go (BApp f x)  e = uncurry (go f e) . prod id (go x e)
 
 class Category c => CCC c where
@@ -618,6 +642,40 @@ testEquality Head      Head      = Just Refl
 testEquality (Tail l)  (Tail r)  = testEquality l r
 testEquality _         _         = Nothing
 \end{code}
+
+We can employ the same insight to construct |testEquality| function for other datatypes. In our indexed Key monad implementation, we use a data-type that can be used to construct a proof that a tree is a \emph{sub-tree} of another tree. To introduce this datatype, we need to be able to construct type-level trees, for which we use the following datatype as a data-kind:
+\begin{code}
+data Tree a = Leaf a | Tree a :*: Tree a
+\end{code}
+With this datatype, we can construct types of kind |Tree *| such as:
+\begin{code}
+Leaf Int :*: (Leaf Bool :*: Leaf String)
+\end{code}
+The following GADT can then be used to produce a proof that a tree |p| is a subtree of a tree |w|, which we denote as |p `Sub` w|:
+\begin{code}
+data p `Sub` w where
+  Whole        :: w `Sub` w
+  LeftChild    :: (l :*: r) `Sub` w -> l `Sub` w
+  RightChild   :: (l :*: r) `Sub` w -> r `Sub` w
+\end{code}
+We can now construct a |testEquality|-like function of the following type:
+\begin{code}
+sameTree :: p `Sub` w -> p' `Sub` w -> Maybe (p :~: p')
+\end{code}
+The implementation of this function is a bit more involved than for |Index|, but is unsuprising:
+\begin{code}
+sameTree :: forall a b w. p `Sub` w -> p' `Sub` w -> Maybe (p :~: p')
+sameTree Whole           Whole = Just Refl
+sameTree (LeftChild l)   (LeftChild r)  = weakenL <$> testEq l r
+sameTree (RightChild l)  (RightChild r) = weakenR <$> testEq l r
+sameTree _               _              = Nothing where 
+  weakenL :: ((l :*: r) :~: (l' :*: r')) -> l :~: l'
+  weakenL x = case x of Refl -> Refl
+
+  weakenR :: ((l :*: r) :~: (l' :*: r')) -> r :~: r'
+  weakenR x = case x of Refl -> Refl
+\end{code}
+
 
 Using hetrogenous indices as |Key|s, we can then implement what we call the \emph{indexed} |Key| monad, where each computation carries an extra type parameter describing the types of the keys that are going to be created in the computation.
 \begin{code}
