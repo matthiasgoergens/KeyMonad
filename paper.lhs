@@ -37,7 +37,7 @@
 %format E2 = "E_2"
 %format EN = "E_n"
 %format uncurryn = "\mathit{uncurry}_n"
-\title{Dynamic typing, Unconstrained!}
+\title{Type-Safe Unconstrained Dynamic Typing\\using the Key Monad}
 \authorinfo{Koen Claessen, Pablo Buiras, Atze van der Ploeg}{Chalmers University of Technology}
            {\{koen, buiras, atze\}@@chalmers.se}
 \begin{document}
@@ -47,19 +47,23 @@
 \newcommand{\koen}[1]{{\it Koen says: #1}}
 \newcommand{\pablo}[1]{{\it Pablo says: #1}}
 
+\section*{Alternative titles}
+
+The Key Monad: more general than the ST-monad, less constrained than dynamic types
+
+The Key Monad: providing unconstrained dynamic typing since 2000.
+
+Pimp your existential types using the Key Monad
+
 \section{Introduction}
 
+The |ST|-monad \cite{st-monad} in Haskell is an impressive feat of language design, but also a complicated beast. It provides and combines three separate features: (1) an abstraction for {\em global memory references} that can be efficiently written to and read from, (2) a mechanism for embedding computations involving these memory references in {\em pure computations}, and (3) a design that allows references in the same computation to be of {\em arbitrary, different types}, in a type-safe manner.
 
-\section{The Key Monad}
-
-
-
-
-\begin{figure}
-  \rule{\columnwidth}{0.4pt}
+\begin{figure}[t]
+\rule{\columnwidth}{0.4pt}
 \begin{code}
-type Key
 type KeyM
+type Key
 
 instance Monad (KeyM s)
 newKey        :: KeyM s (Key s a)
@@ -70,8 +74,30 @@ data a :~: b where
   Refl :: a :~: a
 \end{code}
 \caption{The Key monad interface}
-\label{interface}
+\label{fig:key-monad}
 \end{figure}
+
+In this paper, we attempt to provide a new abstraction in Haskell that only provides feature (3) above: the combination of references (which we call {\em keys}) of different, unconstrainted types in the same computation. The result is a small library called {\em the Key Monad}. The API is given in Fig.\ \ref{fig:key-monad}.
+
+The Key Monad |KeyM| is basically a crippled version of the |ST|-monad: we can monadically create keys of type |Key s a| using the function |newKey|, but we cannot read or write values to these keys; in fact, keys do not carry any value at all. We can convert a computation in |KeyM| into a pure value by means of |runKeyM|, which requires the computation to be polymorphic in |s|, just like |runST| would.
+
+The only new feature is the function |testEquality|, which compares two keys for equality. But the keys do not have to be of the same type! They just have to come from the same |KeyM| computation, indicated by the |s| argument. If two keys are not equal, the answer is |Nothing|. However, if two keys are found to be equal, {\em then their types should also be the same}, and the answer is |Just Refl|, where |Refl| is a constructor from the GADT |a :~: b| that functions as the ``proof'' that |a| and |b| are in fact the same type\footnote{It is actually possible to add |testEquality| to the standard interface of |STRef|s, which would provide much the same features in the ST-monad as the Key Monad would, apart from some laziness issues. However, because of its simplicity, we think the Key Monad is interesting in its own right. See also \ref{sec:discussion}.}.
+
+Why is the Key Monad interesting? There are two separate reasons.
+
+First, decoupling the ability to combine different types into one computation from computations involving state, allows programmers to use the Key Monad in situations where the ST-monad would not have been suitable. In fact, the bulk of this paper presents examples of uses of the Key Monad that would have been impossible without |testEquality|.
+
+Second, the Key Monad is simpler than the ST-monad, because it does not involve global references, or any updatable state at all. We would like to argue that therefore, the Key Monad is easier to understand than the ST-monad. Moreover, given the Key Monad, the ST-monad is actually implementable in plain Haskell, albeit less time and memory efficient than the original ST-monad (so missing feature (1) above, but still providing feature (2) and (3)). So one could argue that, if one had to choose, the Key Monad would be the more desirable Haskell extension to pick.
+
+The second reason comes with a possibly unexpected twist.
+
+After its introduction in 1994, several papers have claimed to establish the correctness, fully or partially, of the ST-monad in Haskell \cite{...}. By correctness we mean three things: (a) type safety (programs using the ST-monad are still type safe), (b) referential transparency (programs using the ST-monad are still referentially transparent), and (c) abstraction safety (programs using the ST-monad still obey the parametricity theorem). It came as a complete surprise to the authors that {\em none of the papers we came across in our literature study actually establishes the correctness of the ST-monad in Haskell!}
+
+So, there is a third reason for studying the Key Monad: A correctness proof for the Key Monad could be much simpler than a correctness proof for the ST-monad. The existence of such a proof would conceivably lead to a correctness proof of the ST-monad as well; in fact this is the route that we would currently recommend for anyone trying to prove the ST-monad correct.
+
+This paper does not provide a formal correctness proof of the Key Monad. Instead, we will argue that the correctness of the Key Monad is just as plausible as the correctness of the ST-monad. We hope that the reader will not hold it against us that we do not provide a correctness proof. Instead, we would like this paper to double as a call to arms, to find (ideally, mechanized) proofs of correctness of both the Key Monad and the ST-monad!
+
+\section{The Key Monad}
 
 The interface of our proposed extension, called the ``Key Monad'', is show in Figure \ref{interface}. The interface features two abstract types (types of which the constructors are not available to the user): |Key| and |KeyM|. The Key Monad gives the user the power to create a new, unique, |Key s| via |newKey|. The only operation that is supported on the type |Key| is |testEquality|, which checks if two given keys are the same, and if they are a ``proof'' is returned that the types assocatied with the names are the \emph{same} types. Such a  proof of the equality of type |a| and |b| is given as the GADT |a :~: b|. The |KeyM| computation can be run with |runKeyM|, which requires that the type argument |s| is polymorphic, ensuring that |Key|s cannot escape the |KeyM| computation. 
 
