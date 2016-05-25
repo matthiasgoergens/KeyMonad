@@ -18,7 +18,7 @@
 \newcommand{\aplus}{\mathbin{<\!\!\!\!\mkern1.4mu +\mkern1.4mu\!\!\!\!>}}
 \newcommand{\fmap}{\mathbin{<\!\!\!\mkern-0.4mu\raisebox{0.0pt}{\scalebox{0.8}{\$}}\mkern-0.4mu\!\!\!>}}
 %format :~: =  ":\sim:"
-%format :*: =  ":\!\!\times\!\!:"
+%format :++: =  ":\!\!+\!\!\!+\!\!:"
 %format `Sub` = "\subseteq"
 %format forall = "\forall"
 %format . = ".\:"
@@ -26,7 +26,6 @@
 %format .>>= = "\cdot\!\!\!\bind"
 %format .>> = "\cdot\!\!>\!\!\!>"
 %format -< = "\prec"
-%format Left = "\prec"
 %format >- = "\succ"
 %format :. = "\circ"
 %format procb = "\mathbf{proc}"
@@ -633,7 +632,88 @@ class Category c => CCC c where
 
 \section{The Key monad in Haskell?}
 
-The |Key| monad seems to be a perfectly safe thing, but it seems that it is not expressible in Haskell directly. It \emph{is} however, possible to implement a similar but \emph{weaker} construction. In this section, we show the implementation of this weaker construction and discuss its difference with the Key monad. This motivates our claim that it is unlikely that the |Key| monad is not implementable in Haskell.
+The |Key| monad seems to be a perfectly safe thing, but it seems that it is not expressible in Haskell directly. 
+
+We can straightforwardly implement the |Key| monad by giving each |Key| a unique name. Since each |Key| has a unique name and a single type associated with it, when to |Key|s are the same they types must also be the same. One could implement generating unique names using a state monad, but the |(purity)| key monad law (|m >> n == n| would then not hold. Instead, we implement the |Key| monad using an splittable name supply, with the following interface:
+\begin{code}
+newNameSupply  :: NameSupply
+split          ::  NameSupply -> 
+                   (NameSupply , NameSupply)
+supplyName     :: NameSupply -> Name
+\end{code}
+The implementation of the |Key| monad is as follows:
+\begin{code}
+data KeyM s a = 
+  KeyM { getKeyM :: NameSupply -> a }
+data Key s a   = Key Name
+
+newKey :: KeyM s (Key s a)
+newKey = KeyM $ \s -> Key (supplyName s)
+
+instance Monad (KeyM s) where
+  return x      = KeyM $ \_ -> x
+  m >>= f       = KeyM $ \s ->
+     let (sl,sr) = split s
+     in getKeyM (f (getKeyM m sl)) sr
+
+runKeyM :: (forall s. KeyM s a) -> a
+runKeyM (KeyM f)  = f newNameSupply
+\end{code}
+The |testEquality| function shows that the |Key| monad is an extension of Haskell: it uses |unsafeCoerce|:
+\begin{code}
+testEquality (Key l) (Key r) 
+  | l == r     = Just (unsafeCoerce Refl)
+  | otherwise  = Nothing
+\end{code}
+
+One implementation of the |NameSupply| uses paths in a binary tree:
+\begin{code}
+data TreePath = Start | Left TreePath | Right TreePath
+\end{code}
+When reading left-to-right, these paths are given in reverse order from the root: the path |Left (Right Start)| is a path to the left child of the right child of the root. A name is then a path to leaf in a tree, and a namesupply is a path to a subtree. To split a |NameSupply| we convert a path to a node into a path to the two children of that node:
+\begin{code}
+type NameSupply  = TreePath
+type Name        = TreePath
+newNameSupply  = Start
+split s        = (Left s, Right s)
+supplyName     = id
+\end{code}
+
+A |KeyM| computation consisting of |>>=|,|return| and |newKey| can also be seen as a binary tree where binds are nodes with two children, |newKey|s are leaves and |return|s are empty subtrees. When using the |TreePath| implementation of |NameSupply| the |Name| associated with each key is the path to the |newKey| that created tree that corresponds to the |KeyM| computation. For example, the |Key| resulting from the |newKey| in the expression:
+\begin{code}
+runKeyM $ (m >> newKey) >>= f
+\end{code}
+will get the treepath |Right (Left Start)|.
+
+\subsection{The key parametric effect monad}
+
+While the |Key| monad is not expressible in Haskell without |unsafeCoerce|, it \emph{is} however, possible to implement a similar but \emph{weaker} construction. In this subsection, we show the implementation of this weaker construction and discuss its difference with the Key monad. 
+
+Our weaker construction, called the |Key| parametric effect monad, is an instance of the \emph{parametric effect monad} type class\cite{peff}:
+\begin{code}
+class Effect (m :: k -> * -> *) where
+   type Unit m :: k
+   type Plus m (f :: k) (g :: k) :: k
+
+   rreturn  :: a -> m (Unit m) a
+   (.>>=)   :: m f a -> (a -> m g b) -> m (Plus m f g) b
+\end{code}
+The laws are the same as for monad, which entails that |Unit| and |Plus| must form a type level monoid. The interface of the |Key| parametric effect monad is as follows:
+\begin{code}
+newKey :: KeyPm s (Single a) (Key s a)
+
+testEquality :: Key s a -> Key s b -> Maybe (a :~: b)
+
+instance Effect (KeyPm s) where
+  type Unit (KeyPm s) = Empty
+  type Plus (KeyPm s) = (:++:)
+  ...
+
+runKeyPm :: (forall s. KeyPm s l a) -> a
+\end{code}
+We can think of the second type argument to |KeyPm| as a type level list, where |Empty| is the empty list, |Single a| is a singleton list containing |a|, and |:++:| is concatenation.
+
+While similar to the Key monad, this construction is \emph{less powerfull} than the regular key monad because the types of the keys which are going to be created must now be \emph{statically known}. All example use cases of the key monad in this paper rely on the fact that the type of the keys which are going to be created do not have to be statically know. For example, we cannot implement a translation from Parametric Hoas to de Bruijn indices with |KeyIm|, because the type of the keys which will have to be created is precisely the information that a parametric HOAS representation lacks. 
 
 A first insight is that it \emph{is} possible to implement to compare two indices in a heterogenous list, and produce a proof that their types are equal if their values are equal. This is can be done as follows:
 \begin{code}
@@ -643,98 +723,96 @@ testEquality (Tail l)  (Tail r)  = testEquality l r
 testEquality _         _         = Nothing
 \end{code}
 
-We can employ the same insight to construct |testEquality| function for other datatypes. In our indexed Key monad implementation, we use a data-type that can be used to construct a proof that a tree is a \emph{sub-tree} of another tree. To introduce this datatype, we need to be able to construct type-level trees, for which we use the following datatype as a data-kind:
+We can employ the same insight to construct |testEquality| function for other datatypes. Instead of indexes in a heterogenous list, in our indexed |Key| monad, we use \emph{paths in a hetrogenous tree}. To introduce this datatype, we need to be able to construct type-level trees, for which we use the following datatype as a data-kind:
 \begin{code}
-data Tree a = Leaf a | Tree a :*: Tree a
+data Tree a = Empty | Single a | Tree a :++: Tree a
 \end{code}
 With this datatype, we can construct types of kind |Tree *| such as:
 \begin{code}
-Leaf Int :*: (Leaf Bool :*: Leaf String)
+Single Int :++: (Single Bool :++: Single String)
 \end{code}
-The following GADT can then be used to produce a proof that a tree |p| is a subtree of a tree |w|, which we denote as |p `Sub` w|:
+Analogous to |Index|, a path to subtree |s| in a type-level tree |t| is given by the following GADT: 
 \begin{code}
-data p `Sub` w where
-  Whole        :: w `Sub` w
-  LeftChild    :: (l :*: r) `Sub` w -> l `Sub` w
-  RightChild   :: (l :*: r) `Sub` w -> r `Sub` w
+data TTreePath p w where
+  Start   :: TTreePath w w
+  Left    :: TTreePath (l :++: r) w -> TTreePath l w
+  Right   :: TTreePath (l :++: r) w -> TTreePath r w
 \end{code}
+For example, a path to |Single Bool| in the tree |Single Int :++: (Single Bool :++: Single String)| is |Left (Right Start)|.
+
 We can now construct a |testEquality|-like function of the following type:
 \begin{code}
-sameTree :: p `Sub` w -> p' `Sub` w -> Maybe (p :~: p')
+samePath ::  TTreePath p w -> TTreePath p' w 
+             -> Maybe (p :~: p')
 \end{code}
 The implementation of this function is a bit more involved than for |Index|, but is unsuprising:
 \begin{code}
-sameTree :: forall a b w. p `Sub` w -> p' `Sub` w -> Maybe (p :~: p')
-sameTree Whole           Whole = Just Refl
-sameTree (LeftChild l)   (LeftChild r)  = weakenL <$> testEq l r
-sameTree (RightChild l)  (RightChild r) = weakenR <$> testEq l r
-sameTree _               _              = Nothing where 
-  weakenL :: ((l :*: r) :~: (l' :*: r')) -> l :~: l'
+samePath Start      Start      = Just Refl
+samePath (Left l)   (Left r)   = weakenL <$> samePath l r
+samePath (Right l)  (Right r)  = weakenR <$> samePath l r
+samePath _          _          = Nothing where 
+  weakenL :: ((l :++: r) :~: (l' :++: r')) -> l :~: l'
   weakenL x = case x of Refl -> Refl
 
-  weakenR :: ((l :*: r) :~: (l' :*: r')) -> r :~: r'
+  weakenR :: ((l :++: r) :~: (l' :++: r')) -> r :~: r'
   weakenR x = case x of Refl -> Refl
 \end{code}
 
-
-Using hetrogenous indices as |Key|s, we can then implement what we call the \emph{indexed} |Key| monad, where each computation carries an extra type parameter describing the types of the keys that are going to be created in the computation.
+With this machinery, we can implement a \emph{typed} name supply:
 \begin{code}
-type Key = Index
-data KeyIm s l a = 
-   KeyIm { getKeyIm :: TList (Key s) l -> a }
-
-ireturn :: a -> KeyIM s [] a
-ireturn x = KeyIM $ \_ -> x
-
-newKey :: KeyIM s [a] (Key s a) 
-newKey = KeyIM $ \(h ::: _) -> h
+type TNameSupply l s = TTreePath l s
+type TName s a = TTreePath (Single a) s
 \end{code}
-The type argument |l| gives the types of the keys that are going to be created. The argument to the constructor |KeyIm| is a function that given a heterogenous list of |Key|s of the right types, produces a result of type |a|. The implementation of |newKey| takes the key from the (singleton) hetrogenous list.
-
-How can we create such a list of keys? For this we want to create a heterogenous list of indices in a heterogenous list. For a regular list of length |n|, the list of valid indices in that list is |[0..n-1]|. For a heterogenous list of type |TList f [a,b,c]|, the heterogenous list of valid indices in that list is: \begin{code} Head ::: Tail Head ::: Tail (Tail Head) ::: TNil\end{code} To create such heterogenous lists of indices, we employ the following type class:
+A typed name supply of type |TNameSupply l s| gives unique names for the types in the subtree |l| which can be tested for equality with all unique names which are created in the context |s|. The implementation of the name supply function are completely analogous to their untyped counterparts: 
 \begin{code}
-class MakeIndices (l :: [*]) where
-  makeIndices :: TList (Index l) l
-instance MakeIndices [] where 
-  makeIndices = TNil
-instance MakeIndices (h : t) where
-  makeIndices = Head ::: pfmap Tail makeIndices
+newTNameSupply :: TNameSupply s s
+newTNameSupply = Start
+
+tsplit ::  TNameSupply (l :++: r) s 
+           -> (TNameSupply l s, TNameSupply r s)
+tsplit t = (Left t, Right t)
+
+supplyTName :: TNameSupply (Leaf a) s -> TName s a
+supplyTName = id
 \end{code}
-In the |h:t| case, we obtain a heterogenous list of indices for the tail and |pfmap Tail| on this list to make it into indices into |h:t| and prepend it with an index for the head of the list.
 
-
-Using this construction, we can implement running a key computation as follows:
+Using the type named supply, our implementation of the key parametric effect monad is analogous to the regular |Key| monad:
 \begin{code}
-runKeyIm :: MakeIndices l => (forall s. KeyIm s l a) -> a
-runKeyIm m = getKeyIm m makeKeys
+type Key s a = TName (Single a) s
+
+data KeyPm s p a = 
+  KeyPm { getKeyIm :: TNameSupply p s -> a }
+
+newKeyIm = KeyPm $ \s -> Key (supplyTName s)
+
+instance Effect (KeyPm s) where
+  type Unit (KeyPm s) = Empty
+  type Plus (KeyPm s) = (:++:)
+  
+  rreturn x = KeyPm $ \_ -> x
+  m .>>= f = KeyPm $ \s ->
+        let (sl,sr) = tsplit s
+        in getKeyIm (f (getKeyIm m sl)) sr
+
+runKeyIm :: (forall s. KeyPm l s a) -> a
+runKeyIm (KeyPm f) = f newTNameSupply
 \end{code}
-This works by first converting the type |forall s. KeyIm s l a| to |KeyIm l l a| and then constructing the indicices in the type-level list |l|. For a key computation of type |KeyIm s l a|, |l| is the list of types of the keys it creates, and |s| can be thought of as the list of types that the \emph{context} of creates. For instance, |newKey| creates a single key, but can be embedded into any context |s|. When we finally run a key computation, we state that the context is the is the computation itself and hence convert |forall s. KeyIm s l a| to |KeyIm l l a|.
+Note that |runKeyIm| now uses the type universally quantified type variable to |s| to unifiy |s| with |l|. This ``closes the context'', stating that the context is precisely the types which are created in the computation. In contrast, in |runKeyM| the type variable was not given an interpretation.
 
-To implement bind (|.>>=|) we need to be able to split the list of keys we obtain to pass the appropriate part to the left and right parts of the computation. For this, we use the following type class:
+Another difference with the regular key monad is that we do not need |unsafeCoerce| for |testEquality| now:
 \begin{code}
-class Split l where
-  split :: TList f (l .++ r) -> (TList f l, TList f r)
-instance Split [] where
-  split r    = (TNil, r)
-instance Split t => Split (h : t) where
-  split (h ::: t) = let (l,r) = split t
-                    in (h ::: l, r)
-\end{code}
-Where |.++| is |++| on type level lists, implemented via closed type families in the obvious way. Using this splitting machinery, we can implement bind as follows:
-\begin{code}
-(.>>=) :: Split l =>  KeyIM s l a -> (a -> KeyIM s r b) -> 
-                      KeyIM s (l .++ r) b
-m .>>= f = KeyIM $ \t ->  let  (lk,rk) = split t
-                               x = runKeyIM m lk
-                          in runKeyIM (f x) rk
+testEquality :: Key s a -> Key s a -> Maybe (a :~: b)
+testEquality l r = weakenSingle <$> samePath l r where 
+  weakenSingle :: (Single a :~: Single b) -> a :~: b
+  weakenSingle x = case x of Refl -> Refl
 \end{code}
 
 
-While similar to the Key monad, this construction is \emph{less powerfull} than the regular key monad because the types of the keys which are going to be created must now be \emph{statically known}. All example use cases of the key monad in this paper rely on the fact that the type of the keys which are going to be created do not have to be statically know. For example, we cannot implement a translation from Parametric Hoas to de Bruijn indices with |KeyIm|, because the type of the keys which will have to be created is precisely the information that a parametric HOAS representation lacks. 
+
 
 It might seem possible to implement the |Key| monad by using an existential type to hide the types which are created in the rest of the computation. 
 \begin{code}
-type KeyM s a = exists l. KeyIm s l a
+type KeyM s a = exists l. KeyPm s l a
 \end{code}
 For presentational purposes, we use a hypothetical notation for existential types and ignore the |Split| and |MakeKeys| constraints in this discussion.
 With the above type, the implementations of |runKeyM| and |join| then fail to type-check. The problem with |runKeyM| is then that the argument is of type |forall s. exists l. KeyIm s l a|, which we want to transform to |exists l. KeyIm l l a|. However, this transformation does not type-check:
@@ -743,15 +821,15 @@ forall s. exists l. p s l /= exists l. forall s. p s l
 \end{code}
 For join, a similar problem arises. The argument of join is of type:
 \begin{code}
-exists l1. KeyIm s l1 (exists l2. KeyIM s l2 a) 
+exists l1. KeyPm s l1 (exists l2. KeyPm s l2 a) 
 \end{code}
 Unwrapping the definition of |KeyIm| this becomes:
 \begin{code}
-exists l1. TList (Key s) l1 -> exists l2. TList (Key s) l2 -> a
+exists l1. TNameSupply l1 s -> exists l2. TNameSupply l2 s -> a
 \end{code}
 We could easily implement bind if we could transform this to:
 \begin{code}
-exists l1 l2. TList (Key s) l1 -> TList (Key s) l2 -> a
+exists l1 l2. TNameSupply l1 s -> TNameSupply l2 s -> a
 \end{code}
 However, this is not an equivalent type:
 \begin{code}
@@ -784,32 +862,7 @@ The second type argument of |KeyEff| gives the list of the types of keys that ar
 
 
 
- In the rest of this section, we argue informally for the safety of the |Key| monad and its implementation.
-A straightforward implementation of the Key monad creates a new globally unique key for each key. For example, an implemenation using a plethora of unsafe extensions is as follows: 
-\begin{code}
-newtype KeyM  s a = KeyM {getKeyM :: IO a }
-    deriving (Applicative, Functor)
-newtype Key   s a = Key Unique
 
-testEquality :: Key s a -> Key s b -> Maybe (a :~: b)
-testEquality (Key i) (Key j) 
-  | i == j     = Just (unsafeCoerce Refl)
-  | otherwise  = Nothing
-
-instance Monad (KeyM s) where
-  return x = KeyM (return x)
-  m >>= f  = KeyM $
-    do x <- unsafeInterleaveIO (getKeyM m)
-       f x
-  m >> n   = n
-
-newKey :: KeyM s (Key s a)
-newKey = KeyM newUnique
-
-runKeyM :: (forall s . KeyM s a) -> a
-runKeyM (KeyM m) = unsafePerformIO m
-\end{code}
-This implementation has the disturbing feature that it uses \emph{three} functions whose names have |unsafe| as a prefix. A state monad implementation to provide unique numbers and only uses |unsafeCoerce| is also possible, but does not fulfill the law |m >> n = n|, which is why |unsafeInterleaveIO| is needed. Although it initially looks shady, we believe that this implementation is safe. But what do we mean precisely, when we say ``safe''?
 
 \paragraph{Type safety}
 The first safety property that we conjecture the Key monad has is \emph{type safety}: |testEquality| will never allow us to proof |a :~: b| for two \emph{distinct} types. The informal agument is that each Key has one type associated with it, and a unique number, and hence if the numbers are the same the types must also be the same. The assumption that each Key has \emph{one} type associated with it is broken if we have  a (non-bottom) value of type |forall a. Key s a| for some specific |s|. This hypothetical value can be used to construct |unsafeCoerce :: a -> b| because it is a unique key for \emph{any} type. The argument why no non-bottom value of this type can be created by using the key monad is that we can only create new keys with |newKey| and the type |forall s. KeyM (forall a. Key s a)| does not unify with the type of |newKey|, namely |forall s a. KeyM (Key s a)|. For the same reason, it is also not possible to get polymorphic references, i.e. references of type |(forall a. IORef a)| in Haskell. Moreover, if the type of |runKeyM| is also crucial for type-safety. If its type was |KeyM s a -> a| instead of |(forall s. KeyM s a) -> a| we could create a polymorphic key with |runKeyM newKey :: forall a. Key s a|.
@@ -865,6 +918,25 @@ A tricky bit here is that since a |Key| computation might create an infinite num
 
 \paragraph{Termination?}
 
+\begin{code}
+data D s a
+  = Fun (Box s -> D s a)
+  | Val a
+
+apply :: Key s (D s a) -> D s a -> D s a -> D s a
+apply k (Fun f) x = f (Hide k x)
+
+unVal :: D s a -> a
+unVal (Val x) = x
+
+wrap :: Key s (D s a) -> (a -> a) -> D s a
+wrap k f = Fun (Val . f . unVal . unHide k)
+
+fix :: (a -> a) -> a
+fix f = runKeyM (do k <- newKey
+              let wf = Fun (\x -> apply k (wrap k f) (apply k (unlock k x) (unlock k x)))
+              return (u (apply k wf wf)))
+\end{code}
 
 
 \bibliographystyle{apalike}

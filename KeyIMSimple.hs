@@ -2,27 +2,49 @@
 import Unsafe.Coerce
 import HList
 import Data.Type.Equality
+import Control.Applicative
+{-
+class  TNameSupply (ts :: k -> k -> *) where
+  type TName ts :: k -> * -> *
+  type Single ts :: * -> k
+  type Append ts :: k -> k -> k
+  newTNameSupply :: ts w w
+  tsplit :: ts (Append ts l r) w -> (ts l w, ts r w)
+  supplyTName :: ts (Single ts a) s -> TName ts s a
+-}
 
+  
 
-data Tree a = Leaf a | (Tree a) :*: (Tree a)
+data Tree a = Leaf a | (Tree a) :++: (Tree a)
 
 data p `Sub` w where
-  Whole :: w `Sub` w
-  LeftChild   :: (l :*: r) `Sub` w -> l `Sub` w
-  RightChild   :: (l :*: r) `Sub` w -> r `Sub` w
+  Start :: w `Sub` w
+  LeftChild   :: (l :++: r) `Sub` w -> l `Sub` w
+  RightChild   :: (l :++: r) `Sub` w -> r `Sub` w
 
 testEq :: forall a b w. a `Sub` w -> b `Sub` w -> Maybe (a :~: b)
-testEq Whole           Whole = Just Refl
+testEq Start           Start = Just Refl
 testEq (LeftChild l)   (LeftChild r)  = weakenL <$> testEq l r
 testEq (RightChild l)  (RightChild r) = weakenR <$> testEq l r
-testEq _               _              = Nothing where 
-  weakenL :: ((l :*: r) :~: (l' :*: r')) -> l :~: l'
-  weakenL x = case x of Refl -> Refl
+testEq _               _              = Nothing  
+weakenL :: ((l :++: r) :~: (l' :++: r')) -> l :~: l'
+weakenL x = case x of Refl -> Refl
 
-  weakenR :: ((l :*: r) :~: (l' :*: r')) -> r :~: r'
-  weakenR x = case x of Refl -> Refl
+weakenR :: ((l :++: r) :~: (l' :++: r')) -> r :~: r'
+weakenR x = case x of Refl -> Refl
 
+type TName s a = Leaf a `Sub` s
 
+type TNameSupply p s = Sub p s
+
+newTNameSupply :: TNameSupply s s
+newTNameSupply = Start
+
+tsplit :: TNameSupply (l :++: r) s -> (TNameSupply l s, TNameSupply r s)
+tsplit s = (LeftChild s, RightChild s)
+
+supplyTName :: TNameSupply (Leaf a) s -> TName s a
+supplyTName = id
 
 
 data Key s a = Key (Sub (Leaf a) s)
@@ -34,20 +56,24 @@ instance TestEquality (Key s) where
       Nothing   -> Nothing
                                    
 
-type KeyIm l s a = Sub l s -> a
+data KeyIm p s a = KeyIm { getKeyIm :: TNameSupply p s -> a }
 
 newKeyIm :: KeyIm (Leaf a) s (Key s a)
-newKeyIm = Key
+newKeyIm = KeyIm $ \s -> Key (supplyTName s)
+
+
 
 ireturn :: a -> KeyIm l s a
-ireturn x = \_ -> x
+ireturn x = KeyIm $ \_ -> x
+
+(.>>=) :: KeyIm l s a -> (a -> KeyIm r s b) -> KeyIm (l :++: r) s b
+m .>>= f = KeyIm $ \s ->
+        let (sl,sr) = tsplit s
+        in getKeyIm (f (getKeyIm m sl)) sr
 
 runKeyIm :: (forall s. KeyIm l s a) -> a
-runKeyIm f = f Whole
-
-(.>>=) :: KeyIm l s a -> (a -> KeyIm r s b) -> KeyIm (l :*: r) s b
-m .>>= f = \t -> f (m (LeftChild t)) (RightChild t)
-
+runKeyIm (KeyIm f) = f newTNameSupply
+{-
 data KeyM s a where
   KeyM :: KeyIm l s a -> KeyM s a
 
@@ -68,4 +94,4 @@ instance Monad (KeyM s) where
     KeyM m' -> KeyM $ m' .>>= \x ->
            case f x of
               KeyM f' -> unsafeCoerce f'
-
+-}
