@@ -21,6 +21,7 @@
 %format :++: =  ":\!\!+\!\!\!+\!\!:"
 %format `Sub` = "\subseteq"
 %format forall = "\forall"
+%format exists = "\exists"
 %format . = ".\:"
 %format >>> = "\mathbin{>\!\!\!>\!\!\!>}"
 %format .>>= = "\cdot\!\!\!\bind"
@@ -62,16 +63,15 @@ The |ST|-monad \cite{st-monad} in Haskell is an impressive feat of language desi
 \begin{figure}[t]
 \rule{\columnwidth}{0.4pt}
 \begin{code}
-type KeyM
-type Key
+type KeyM s a
+type Key s a
 
 instance Monad (KeyM s)
 newKey        :: KeyM s (Key s a)
 testEquality  :: Key s a -> Key s b -> Maybe (a :~: b)
 runKeyM       :: (forall s. KeyM s a) -> a
 
-data a :~: b where
-  Refl :: a :~: a
+data a :~: b where Refl :: a :~: a
 \end{code}
 \caption{The Key monad interface}
 \label{fig:key-monad}
@@ -81,7 +81,7 @@ In this paper, we attempt to provide a new abstraction in Haskell that only prov
 
 The Key Monad |KeyM| is basically a crippled version of the |ST|-monad: we can monadically create keys of type |Key s a| using the function |newKey|, but we cannot read or write values to these keys; in fact, keys do not carry any value at all. We can convert a computation in |KeyM| into a pure value by means of |runKeyM|, which requires the computation to be polymorphic in |s|, just like |runST| would.
 
-The only new feature is the function |testEquality|, which compares two keys for equality. But the keys do not have to be of the same type! They just have to come from the same |KeyM| computation, indicated by the |s| argument. If two keys are not equal, the answer is |Nothing|. However, if two keys are found to be equal, {\em then their types should also be the same}, and the answer is |Just Refl|, where |Refl| is a constructor from the GADT |a :~: b| that functions as the ``proof'' that |a| and |b| are in fact the same type\footnote{It is actually possible to add |testEquality| to the standard interface of |STRef|s, which would provide much the same features in the ST-monad as the Key Monad would, apart from some laziness issues. However, because of its simplicity, we think the Key Monad is interesting in its own right. See also \ref{sec:discussion}.}.
+The only new feature is the function |testEquality|, which compares two keys for equality. But the keys do not have to be of the same type! They just have to come from the same |KeyM| computation, indicated by the |s| argument. If two keys are not equal, the answer is |Nothing|. However, if two keys are found to be equal, {\em then their types should also be the same}, and the answer is |Just Refl|, where |Refl| is a constructor from the GADT |a :~: b| that functions as the ``proof'' that |a| and |b| are in fact the same type\footnote{It is actually possible to add |testEquality| to the standard interface of |STRef|s, which would provide much the same features in the ST-monad as the Key Monad would, apart from some laziness issues\atze{Which laziness issues? I don't think there are any.}. However, because of its simplicity, we think the Key Monad is interesting in its own right. See also \ref{sec:discussion}.}.
 
 Why is the Key Monad interesting? There are two separate reasons.
 
@@ -428,7 +428,7 @@ proc f = runKeyM $
           return (fromEnvA inK a outC)
 \end{code} 
 
-Because all the operations in the |ArrowSyn| return the type |Cage s|, it not possible to use observe the output of an arrow computation to decide what to do next. While we cannot decide what to do next based on the output of a computation of type |ArrowSyn s (Cage s x)|, we can, for example, decide what to next based on the outcome of a computation of type |ArrowSyn s Int|. This does not give our embedded arrow notation more power than regular arrow notation: because each primitive operation returns something of type |Cage s a|, the value of the integer cannot depend on the result of an arrow computation. This essentially the same trick as described in Svenningsson and Svensson\cite{bjorn}.
+Because all the operations in the |ArrowSyn| return a |Cage|, it not possible to observe the output of an arrow computation to decide what to do next. While we cannot decide what to do next based on the output of a computation of type |ArrowSyn s (Cage s x)|, we can, for example, decide what to next based on the outcome of a computation of type |ArrowSyn s Int|. This does not give our embedded arrow notation more power than regular arrow notation: the value of the integer cannot depend on the result of an arrow computation and hence must be the result of a pure computation. This essentially the same trick as described in Svenningsson and Svensson\cite{bjorn}.
 
 While the above construction is a monad, it is also possible to make a simillar construction for arrows which is a \emph{relative monad}\cite{relmonad}. A relative monad is an instance of the following type class:
 \begin{code}
@@ -436,7 +436,7 @@ class RelMonad m v where
   rreturn :: v x -> m x
   (.>>=)  :: m x -> (v x -> m y) -> m y
 \end{code}
-The only difference with the regular monad type class is that the values are now wrapped in a type constructor |v|. Relative monads are a generalization of monads, because each monad can be made a relative monad by setting |v| to |Id|. 
+The only difference with the regular monad type class is that the values are now wrapped in a type constructor |v|. The laws are also the same. Relative monads are a generalization of monads, because each monad can be made a relative monad by setting |v| to |Id|. 
 We can construct a similar construction as |ArrowSyn| as follows:
 \begin{code}
 data ArrowRm a s x = ArrowRm 
@@ -444,8 +444,9 @@ data ArrowRm a s x = ArrowRm
 instance RelMonad (ArrowRm a s) (Cage s) where ...
 \end{code}
 
-Altenkrich\cite{relmonad} shows that in category theory arrows are a special case of relative monads, but his construction is not a relative monad in Haskell. In particular 
-his definition of bind does not allow us freely use bound values, instead it requires us to manually lift values into scope, in the same fashion as directly using de Bruijn indices. Our construction suggests that arrows are also a special case of relative monad in Haskell with the key monad, but a formal proof is outside the scope of this paper.
+Altenkrich\cite{relmonad} shows that in category theory arrows are a special case of relative monads, but his construction is not a relative monad in Haskell. In particular his definition of bind does not allow us freely use bound values, instead it requires us to manually lift values into scope, in the same fashion as directly using de Bruijn indices. Our construction suggests that arrows are also a special case of relative monad in Haskell with the key monad, but a formal proof is outside the scope of this paper. 
+
+The \emph{Arrow Calculus}\cite{arrowcalc} describes a translation of a form of arrow syntax (not embedded in Haskell) to arrows which is very simillar to the construction presented here. Their calculus has five laws, three of which can be considered to be relative monad laws, which they use to prove the equational correspondance between their calculus and regular arrows. Due to the simillarity, their paper should provide a good starting point for anyone trying to prove the same for this construction.
 
 
 
@@ -656,11 +657,17 @@ class Category c => CCC c where
 
 \end{figure}
 
-\section{The Key monad in Haskell?}
+\section{Implementing the Key monad}
 
-The |Key| monad seems to be a perfectly safe thing, but it seems that it is not expressible in Haskell directly. 
+\atze{What do you guys think about this section?}
 
-We can straightforwardly implement the |Key| monad by giving each |Key| a unique name. Since each |Key| has a unique name and a single type associated with it, when to |Key|s are the same they types must also be the same. One could implement generating unique names using a state monad, but the |(purity)| key monad law (|m >> n == n| would then not hold. Instead, we implement the |Key| monad using an splittable name supply, with the following interface:
+The |Key| monad seems to be a perfectly safe thing, but it seems that it is not expressible in Haskell directly. Why?
+
+To try to answer this question, we first discuss an implementation of the |Key| monad in Haskell which uses |unsafeCoerce|. To explore how far we can get without |unsafeCoerce|, we then discuss a weaker construction, called the Key paramateric effect monad. We then explore the relation between the two, which gives another way of thinking about the implementation of the |Key| monad.
+
+\subsection{Implementation using |unsafeCoerce|}
+
+We can straightforwardly implement the |Key| monad by giving each |Key| a unique name. One could implement generating unique names using a state monad, but the |(purity)| key monad law (|m >> n == n)| would then not hold. Instead, we implement the |Key| monad using an splittable name supply, with the following interface:
 \begin{code}
 newNameSupply  :: NameSupply
 split          ::  NameSupply -> 
@@ -685,18 +692,19 @@ instance Monad (KeyM s) where
 runKeyM :: (forall s. KeyM s a) -> a
 runKeyM (KeyM f)  = f newNameSupply
 \end{code}
-The |testEquality| function shows that the |Key| monad is an extension of Haskell: it uses |unsafeCoerce|:
+The |testEquality| function uses |unsafeCoerce|:
 \begin{code}
 testEquality (Key l) (Key r) 
   | l == r     = Just (unsafeCoerce Refl)
   | otherwise  = Nothing
 \end{code}
+The informal argument why this use of |unsafeCoerce| is safe is that each |Key| has a unique name and a single type associated with it, and hence when two |Key|s are the same their types must also be the same. 
 
-One implementation of the |NameSupply| uses paths in a binary tree:
+But how do we implement such a |NameSupply|? One implementation of the |NameSupply| uses paths in a binary tree:
 \begin{code}
 data TreePath = Start | Left TreePath | Right TreePath
 \end{code}
-When reading left-to-right, these paths are given in reverse order from the root: the path |Left (Right Start)| is a path to the left child of the right child of the root. A name is then a path to leaf in a tree, and a namesupply is a path to a subtree. To split a |NameSupply| we convert a path to a node into a path to the two children of that node:
+When reading left-to-right, these paths are given in reverse order from the root: the path |Left (Right Start)| is a path to the left child of the right child of the root. A name is then a path to leaf in a tree, and a namesupply is a path to a subtree. To split a |NameSupply|, we convert a path to a node into a path to the two children of that node:
 \begin{code}
 type NameSupply  = TreePath
 type Name        = TreePath
@@ -705,17 +713,17 @@ split s        = (Left s, Right s)
 supplyName     = id
 \end{code}
 
-A |KeyM| computation consisting of |>>=|,|return| and |newKey| can also be seen as a binary tree where binds are nodes with two children, |newKey|s are leaves and |return|s are empty subtrees. When using the |TreePath| implementation of |NameSupply| the |Name| associated with each key is the path to the |newKey| that created tree that corresponds to the |KeyM| computation. For example, the |Key| resulting from the |newKey| in the expression:
+A |KeyM| computation consisting of |>>=|,|return| and |newKey| can also be seen as a binary tree where binds are node, |newKey|s are leaves and |return|s are empty subtrees. The |Name| associated with each key is the path to the |newKey| that created it, in the tree that corresponds to the |KeyM| computation. For example, the |Key| resulting from the |newKey| in the expression:
 \begin{code}
 runKeyM $ (m >> newKey) >>= f
 \end{code}
-will get the treepath |Right (Left Start)|.
+will get the name |Right (Left Start)|.
 
 \subsection{The key parametric effect monad}
 
-While the |Key| monad is not expressible in Haskell without |unsafeCoerce|, it \emph{is} however, possible to implement a similar but \emph{weaker} construction. In this subsection, we show the implementation of this weaker construction and discuss its difference with the Key monad. 
+While the |Key| monad is not expressible in Haskell without |unsafeCoerce|, it \emph{is} possible to implement a similar but \emph{weaker} construction. In this subsection, we show the implementation of this weaker construction, called the |Key| parametric effect monad,  and discuss its difference with the Key monad. 
 
-Our weaker construction, called the |Key| parametric effect monad, is an instance of the \emph{parametric effect monad} type class\cite{peff}:
+Our weaker construction is an instance of the \emph{parametric effect monad} type class\cite{peff}:
 \begin{code}
 class Effect (m :: k -> * -> *) where
    type Unit m :: k
@@ -739,9 +747,9 @@ runKeyPm :: (forall s. KeyPm s l a) -> a
 \end{code}
 We can think of the second type argument to |KeyPm| as a type level list, where |Empty| is the empty list, |Single a| is a singleton list containing |a|, and |:++:| is concatenation.
 
-While similar to the Key monad, this construction is \emph{less powerfull} than the regular key monad because the types of the keys which are going to be created must now be \emph{statically known}. All example use cases of the key monad in this paper rely on the fact that the type of the keys which are going to be created do not have to be statically know. For example, we cannot implement a translation from Parametric Hoas to de Bruijn indices with |KeyIm|, because the type of the keys which will have to be created is precisely the information that a parametric HOAS representation lacks. 
+While similar to the Key monad, this construction is \emph{less powerfull} than the regular key monad because the types of the keys which are going to be created must now be \emph{statically known}. All example use cases of the key monad in this paper rely on the fact that the type of the keys which are going to be created do not have to be statically know. For example, we cannot implement a translation from parametric Hoas to de Bruijn indices with |KeyPm|, because the type of the keys which will have to be created is precisely the information that a parametric HOAS representation lacks. 
 
-A first insight is that it \emph{is} possible to implement to compare two indices in a heterogenous list, and produce a proof that their types are equal if their values are equal. This is can be done as follows:
+A crucial insight is that is needed for this implemenation, is that it \emph{is} possible to implement to compare two indices in a heterogenous list, and produce a proof that their types are equal if their values are equal. This is can be done as follows:
 \begin{code}
 testEquality :: Index l a -> Index l b -> Maybe (a :~: b)
 testEquality Head      Head      = Just Refl
@@ -753,18 +761,18 @@ We can employ the same insight to construct |testEquality| function for other da
 \begin{code}
 data Tree a = Empty | Single a | Tree a :++: Tree a
 \end{code}
-With this datatype, we can construct types of kind |Tree *| such as:
+With this datatype, we can construct types of kind |Tree| |*| such as:
 \begin{code}
 Single Int :++: (Single Bool :++: Single String)
 \end{code}
-Analogous to |Index|, a path to subtree |s| in a type-level tree |t| is given by the following GADT: 
+We can now adapt the datatype |TreePath| to provide paths in type-level trees instead of value-level trees, in a similar fashion to how |Index| is an index in a type-level list instead of a value-level list:
 \begin{code}
 data TTreePath p w where
   Start   :: TTreePath w w
   Left    :: TTreePath (l :++: r) w -> TTreePath l w
   Right   :: TTreePath (l :++: r) w -> TTreePath r w
 \end{code}
-For example, a path to |Single Bool| in the tree |Single Int :++: (Single Bool :++: Single String)| is |Left (Right Start)|.
+A value of type |TTreePath p w| is a path to the subtree |p| in the type-level tree |w|. For example, a path to |Single Bool| in the tree |Single Int :++: (Single Bool :++: Single String)| is |Left (Right Start)|.
 
 We can now construct a |testEquality|-like function of the following type:
 \begin{code}
@@ -774,8 +782,8 @@ samePath ::  TTreePath p w -> TTreePath p' w
 The implementation of this function is a bit more involved than for |Index|, but is unsuprising:
 \begin{code}
 samePath Start      Start      = Just Refl
-samePath (Left l)   (Left r)   = weakenL <$> samePath l r
-samePath (Right l)  (Right r)  = weakenR <$> samePath l r
+samePath (Left l)   (Left r)   = weakenL  <$> samePath l r
+samePath (Right l)  (Right r)  = weakenR  <$> samePath l r
 samePath _          _          = Nothing where 
   weakenL :: ((l :++: r) :~: (l' :++: r')) -> l :~: l'
   weakenL x = case x of Refl -> Refl
@@ -802,7 +810,7 @@ supplyTName :: TNameSupply (Leaf a) s -> TName s a
 supplyTName = id
 \end{code}
 
-Using the type named supply, our implementation of the key parametric effect monad is analogous to the regular |Key| monad:
+Using the type named supply, our implementation of the key parametric effect monad is the same as the implementation of the regular |Key| monad:
 \begin{code}
 type Key s a = TName (Single a) s
 
@@ -823,9 +831,12 @@ instance Effect (KeyPm s) where
 runKeyIm :: (forall s. KeyPm l s a) -> a
 runKeyIm (KeyPm f) = f newTNameSupply
 \end{code}
-Note that |runKeyIm| now uses the type universally quantified type variable to |s| to unifiy |s| with |l|. This ``closes the context'', stating that the context is precisely the types which are created in the computation. In contrast, in |runKeyM| the type variable was not given an interpretation.
+The types |Empty| and |:++:| do not form a monoid, so this is strictly speaking not a paramateric effect monad. This is a consequence of our implementation of typed name supplies. It is also possible to provide an implementation of typed name supplies in which |Empty| and |:++:| correspond to the empty type-level list and type-level list append respectively. In this implementation, type-level information is used to decide where to split the list. A full implementation of this can be found in the code online. This implementation is a bit more complex, and corresponds less nicely with the regular key monad implementation. 
 
-Another difference with the regular key monad is that we do not need |unsafeCoerce| for |testEquality| now:
+
+Note that in the implementation |runKeyIm| now uses the type universally quantified type variable to |s| to unifiy |s| with |l|. This ``closes the context'', stating that the context is precisely the types which are created in the computation. In contrast, in |runKeyM| the type variable was not given an interpretation.
+
+We do not need |unsafeCoerce| for |testEquality| now:
 \begin{code}
 testEquality :: Key s a -> Key s a -> Maybe (a :~: b)
 testEquality l r = weakenSingle <$> samePath l r where 
@@ -833,39 +844,44 @@ testEquality l r = weakenSingle <$> samePath l r where
   weakenSingle x = case x of Refl -> Refl
 \end{code}
 
+\subsection{Relation between implementations}
 
-
-
-It might seem possible to implement the |Key| monad by using an existential type to hide the types which are created in the rest of the computation. 
+If we ignore the types that are involved, the implementations of the key monad and the key parametric effect monad are exactly the same, except for some identity functions in the form of weakening and |unsafeCoerce|.  This suggests another implementation of the key monad, by hiding the extra type of |KeyPM|:
 \begin{code}
-type KeyM s a = exists l. KeyPm s l a
+data KeyM s a where
+  KeyM :: KeyPm s p a -> KeyM s a
 \end{code}
-For presentational purposes, we use a hypothetical notation for existential types and ignore the |Split| and |MakeKeys| constraints in this discussion.
-With the above type, the implementations of |runKeyM| and |join| then fail to type-check. The problem with |runKeyM| is then that the argument is of type |forall s. exists l. KeyIm s l a|, which we want to transform to |exists l. KeyIm l l a|. However, this transformation does not type-check:
-\begin{code}
-forall s. exists l. p s l /= exists l. forall s. p s l
-\end{code}
-For join, a similar problem arises. The argument of join is of type:
-\begin{code}
-exists l1. KeyPm s l1 (exists l2. KeyPm s l2 a) 
-\end{code}
-Unwrapping the definition of |KeyIm| this becomes:
-\begin{code}
-exists l1. TNameSupply l1 s -> exists l2. TNameSupply l2 s -> a
-\end{code}
-We could easily implement bind if we could transform this to:
-\begin{code}
-exists l1 l2. TNameSupply l1 s -> TNameSupply l2 s -> a
-\end{code}
-However, this is not an equivalent type:
-\begin{code}
-a -> exists l2. b /= exists l2. a -> b
-\end{code}
-An implementation of the |Key| monad in Haskell would have to overcome these hurdles.
+For presentational purposes we denote this type by |exists p. KeyPm s p a|, which is not valid (GHC) Haskell. While this allows us to provide type-safe implementations of |testEquality|, |fmap|, |newKey| and |return|, things go awry for |join| (or |>>=|) and |runKeyM|.
 
+For |join| we want a implementation of type:
+\begin{code}
+join ::  (exists p. KeyPm s p (exists q. KeyPm s q a)) -> 
+         exists r. KeyPm s r a
+\end{code}of the \emph{argument} should be:
+\begin{code}
+(exists p q. KeyPm s p (KeyPm s q a)) -> exists r. KeyPm s r a
+\end{code}
+Expanding the definition of |KeyPm|, the type of the \emph{argument} we have is:
+\begin{code}
+exists p. TNameSupply p s -> exists q. TNameSupply q s -> a
+\end{code} 
+But the type we need is:
+\begin{code}
+exists p q. TNameSupply p s ->  TNameSupply q s -> a
+\end{code}
+These two types are \emph{not} equivalent: the latter implies the former, but not the other way around. However, in this situation we know more about the possible argument values than the types suggest. We know that |Key| is an abstract type for the user, who only has access to |testEquality|, not the constructors of |Key|. Hence the user-supplied argument function cannot distinguish between different value of the type |TNameSupply p s|. For example, the values |Left Start| and |Left (Left Start)| are indistinguisable for the argument function: both are only used to create unique names, and compare them, not to observe their exact value.   
 
+For this reason, the type that is bound to |q| is the same type for all values of |TNameSupply p s|. Hence, one could argue that it is safe to coerce the argument from the former type to the later type. However, when the |KeyM| computation is infinite this will also lead to an \emph{infinite} type, the consequences of which are unknown to us.
 
-
+Another problem arises at |runKeyM|. We get the type:
+\begin{code}
+runKeyM :: (forall s. exists p. KeyPm s p a) -> a
+\end{code}
+But to use the runKeyPm implementation the type should be:
+\begin{code}
+runKeyM :: (exists p. forall s. KeyPm s p a) -> a
+\end{code}
+Again, these are \emph{not} equivalent: the latter implies the former, but not the other way around. In particular, in the former type the type which is bound to |p| may depend on |s|, which cannot happen in the latter type. If the types of all keys which are created do not mention |s|, we do not for example create a key of type |Key s (Key s a)|, then one could argue that coercing the computation from |forall s. exists p. KeyPm s p a| to |exists p. forall s. KeyPm s p a| is perfectly safe. However, if we create a key where the type does mention |s| then gives rises to \emph{cyclic} types , for example |s ~ (Key s Int) :++: t|. The consequences of allowing cyclic types in Haskell are unknown to us. In the next section, we show that using a key whose type mentions |s| allows us to implement |fix| without using recursion. 
 
 
 
