@@ -851,7 +851,7 @@ If we ignore the types that are involved, the implementations of the key monad a
 data KeyM s a where
   KeyM :: KeyPm s p a -> KeyM s a
 \end{code}
-For presentational purposes we denote this type by |exists p. KeyPm s p a|, which is not valid (GHC) Haskell. While this allows us to provide type-safe implementations of |testEquality|, |fmap|, |newKey| and |return|, things go awry for |join| (or |>>=|) and |runKeyM|.
+For presentational purposes we denote this type by |exists p. KeyPm s p a|, which is not valid (GHC) Haskell. While this allows us to provide type-safe implementations of |testEquality|, |fmap|, |newKey| and |return|, things go awry for |join| (or |>>=|) and |runKeyM|, where we need |unsafeCoerce|.
 
 For |join| we want a implementation of type:
 \begin{code}
