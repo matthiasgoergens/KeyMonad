@@ -194,8 +194,8 @@ testEqualityM :: Key s a -> Key s b -> Maybe (a -> ST s b)
 testEqualityM ka kb
   |  ident ka /= ident kb  = Nothing
   |  otherwise             = Just $ \x ->
-       do  writeSTRef ra x
-           readSTRef rb
+       do  writeSTRef (ref ka) x
+           readSTRef (ref kb)
 \end{code} 
 This implementation, although a bit brittle because it relies on strong invariants, makes use of the insight that if the two references are actually the same reference, then writing to one reference must trigger a result in the other.
 
