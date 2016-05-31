@@ -39,9 +39,9 @@
 %format E2 = "E_2"
 %format EN = "E_n"
 %format uncurryn = "\mathit{uncurry}_n"
-\title{Type-Safe Unconstrained Dynamic Typing\\using the Key Monad}
-\authorinfo{Koen Claessen, Pablo Buiras, Atze van der Ploeg}{Chalmers University of Technology}
-           {\{koen, buiras, atze\}@@chalmers.se}
+\title{The Key Monad:\\Type-Safe Unconstrained Dynamic Typing}
+\authorinfo{Atze van der Ploeg, Koen Claessen, Pablo Buiras}{Chalmers University of Technology}
+           {\{atze, koen, buiras\}@@chalmers.se}
 \begin{document}
 \maketitle
 
