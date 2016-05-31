@@ -100,8 +100,9 @@ This paper does not provide a formal correctness proof of the Key Monad. Instead
 
 \section{The Key Monad}
 
-The interface of our proposed extension, called the ``Key Monad'', is show in Figure \ref{interface}. The interface features two abstract types (types of which the constructors are not available to the user): |Key| and |KeyM|. The Key Monad gives the user the power to create a new, unique, |Key s| via |newKey|. The only operation that is supported on the type |Key| is |testEquality|, which checks if two given keys are the same, and if they are a ``proof'' is returned that the types assocatied with the names are the \emph{same} types. Such a  proof of the equality of type |a| and |b| is given as the GADT |a :~: b|. The |KeyM| computation can be run with |runKeyM|, which requires that the type argument |s| is polymorphic, ensuring that |Key|s cannot escape the |KeyM| computation. 
+The interface of the Key Monad (Fig.\ \ref{fig:key-monad}) features two abstract types (types of which the constructors are not available to the user): |Key| and |KeyM|. The Key Monad gives the user the power to create a new, unique value of type |Key s a| via |newKey|. The only operation that is supported on the type |Key| is |testEquality|, which checks if two given keys are the same, and if they are a ``proof'' is returned that the types assocatied with the names are the \emph{same} types. Such a  proof of the equality of type |a| and |b| is given as a value of the GADT |a :~: b|. The |KeyM| computation can be run with |runKeyM|, which requires that the type argument |s| is polymorphic, ensuring that |Key|s cannot escape the |KeyM| computation. 
 
+\subsection{Unconstrained dynamic typing}
 
 We can use |Key|s to do similar things as with |Data.Typeable|, but \emph{without} the need for |Typeable| constraints. For instance, we can create a variant of |Dynamic| using |Key|s instead of type representations. When given a key and value, we can ``lock up'' the value in a box, which, like |Dynamic|, hides the type of its contents.
 \begin{code}
@@ -120,7 +121,7 @@ If we used the right key, we get |Just| the value in the box, and we get |Nothin
 
 \subsection{Using keys for heterogenous maps}
 
-To implement the |ST| monad using the |Key| monad, we also need a \emph{heterogeneous map}: a datastructure that that maps keys to values of the type corresponding to the key. The heterogenous maps we develop in this subsection can be extended with  \emph{without changing} the \emph{type} of the map. We can implement such maps as follows\footnote{For simplicity, this is a rather inefficient implementation, but a more efficient implementation using |IntMap|s can be given if we use a function |hashKey :: Key s a -> Int|}:
+We can use the |Box|es above to create a kind of \emph{heterogeneous maps}: a datastructure that that maps keys to values of the type corresponding to the key. The interesting feature here is that the type of these heterogenous maps does not depend on the types of the values that are stored in it. We can implement such maps as follows\footnote{For simplicity, this is a rather inefficient implementation, but a more efficient implementation (using |IntMap|s) can be given if we use a function |hashKey :: Key s a -> Int|}:
 \begin{code}
 newtype KeyMap s = Km [Box s]
 
@@ -138,7 +139,7 @@ lookup k (Km (h : t))  =
 
 \subsection{Implementing the |ST| monad}
 
-Armed with our newly obtained |KeyMap|s, we can (inefficiently) implement the |ST| monad as follows. The implementation of |STRef|s is simply as an alias for |Key|s:
+Armed with our newly obtained |KeyMap|s, we can implement a monad with the same interface as the |ST| monad as follows. The implementation of |STRef|s is simply as an alias for |Key|s:
 \begin{code}
 type STRef s a = Key s a
 \end{code}
@@ -156,7 +157,7 @@ newSTRef v = do  k <- lift newKey
                  return k
 
 readSTRef :: STRef s a -> ST s a
-readSTRef r = (\env -> env ! r) <$> get
+readSTRef r = (fromJust . lookup r) `fmap` get
 
 writeSTRef :: STRef s a -> a -> ST s ()
 writeSTRef k v = modify (insert k v)
@@ -173,26 +174,30 @@ Note that while the |Key| monad can be used to implement the |ST| monad, the rev
 \begin{code}
 testEquality :: STRef s a -> STRef s b -> Maybe (a :~: b)
 \end{code}
-If we have such a function, then the |Key| monad is implementable with the |ST| monad (and vice versa). It is straightforward to implement the above function using |unsafeCoerce|:
+If we had such a function, then the |Key| monad would be trivially implementable with the |ST| monad (and vice versa). It is straightforward to implement the above function using |unsafeCoerce|:
 \begin{code}
 testEquality :: STRef s a -> STRef s b -> Maybe (a :~: b)
 testEquality x y
    | x == y     = Just (unsafeCoerce Refl)
    | otherwise  = Nothing
 \end{code}
-Hence, another way to think of this paper is that we signal that the above function is \emph{safe}, and that this allows us to do things which we could not do before.
+Hence, another way to think of this paper is that we claim that the above function is \emph{safe}, that this allows us to do things which we could not do before, and that we propose this as an extension of the |ST|-monad library.
 
-\atze{Koen: you suggested this to be in this paper, but I don't know what it should show. Can you elaborate?}
-It \emph{is} possible to implement a similar, but weaker, version of |testEquality| using only the |ST| monad functions. If we have two references of types |STRef s (Maybe a)| and |STRef s (Maybe b)| then we can create a function that casts a value of type |a| to |STRef s (Maybe b|. The |Maybe| value in the |ST| monad is |Just| if both references where the same, and |Nothing| otherwise.
+It \emph{is} possible to implement a similar, but weaker, version of |testEquality| using only the standard |ST|-monad functions. If we represent keys of type |Key s a| as a pair of an identifier and an |STRef|s containing values of type |a|, then we can create a function that casts a value of type |a| to |b|, albeit monadically.
 \begin{code}
-convert :: STRef s (Maybe a) -> STRef s (Maybe b) -> 
-           a -> ST s (Maybe b)
-convert ra rb c = 
-  do  writeSTRef rb Nothing
-      writeSTRef ra (Just c)
-      readSTRef rb
+data Key s a =
+  Key  {  ident  :: STRef s ()
+       ,  ref    :: STRef s a
+       }
+
+testEqualityM :: Key s a -> Key s b -> Maybe (a -> ST s b)
+testEqualityM ka kb
+  |  ident ka /= ident kb  = Nothing
+  |  otherwise             = Just $ \x ->
+       do  writeSTRef ra x
+           readSTRef rb
 \end{code} 
-This implementation relies on the insight that the two references are actually the same reference, then writing to one reference must trigger a result in the other.
+This implementation, although a bit brittle because it relies on strong invariants, makes use of the insight that if the two references are actually the same reference, then writing to one reference must trigger a result in the other.
 
 \subsection{Key monad laws}
 
