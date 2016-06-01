@@ -185,10 +185,7 @@ Hence, another way to think of this paper is that we claim that the above functi
 
 It \emph{is} possible to implement a similar, but weaker, version of |testEquality| using only the standard |ST|-monad functions. If we represent keys of type |Key s a| as a pair of an identifier and an |STRef|s containing values of type |a|, then we can create a function that casts a value of type |a| to |b|, albeit monadically.
 \begin{code}
-data Key s a =
-  Key  {  ident  :: STRef s ()
-       ,  ref    :: STRef s a
-       }
+data Key s a = Key{ ident :: STRef s (), ref :: STRef s a }
 
 testEqualityM :: Key s a -> Key s b -> Maybe (a -> ST s b)
 testEqualityM ka kb
@@ -518,7 +515,7 @@ In Parametric HOAS, typed lambda terms are represented by the following data typ
 data Phoas v a where
   PVar  :: v a -> Phoas v a
   PLam  :: (v a -> Phoas v b) -> Phoas v (a -> b)
-  PApp  :: Phoas v (a -> b) -> Phoas v a -> PHoas b
+  PApp  :: Phoas v (a -> b) -> Phoas v a -> Phoas b
 \end{code}
 The reading of the type parameter |v| is the type of \emph{variables}.
 For example, the lambda term |(\x y -> x)| can be constructed as follows:
@@ -618,7 +615,7 @@ pfmapkm :: (forall x. f x -> g x) ->
 pfmapkm f (FKm m) = FKm (fmap (pfmap f) m)
 \end{code}
 
-We store the current ``enviroment'' as a |FKeyMap| mapping each |Key| to an |Index| in the current enviroment. When we enter a lambda-body, we need to extend the enviroment with a new name mapping to the de Bruijn index |HHead|, and add one lookup step to each other de Bruijn index currently in the |FKeyMap|. This is be done as follows:
+We store the current ``environment'' as a |FKeyMap| mapping each |Key| to an |Index| in the current enviroment. When we enter a lambda-body, we need to extend the enviroment with a new name mapping to the de Bruijn index |HHead|, and add one lookup step to each other de Bruijn index currently in the |FKeyMap|. This is be done as follows:
 \begin{code}
 extend :: Key s h -> FKeyMap s (Index t) ->
             FKeyMap s (Index (h : t))
@@ -852,24 +849,6 @@ While the above reasoning does not consitite a formal proof of the safety of the
 
 \section{Safety of the |Key| monad}
 
-\subsection{Why adding extra types is not good enough}
-
-
-
-\begin{code}
-newKey :: KeyEff s [a] (Key s a)
-runKeyEff :: (forall s. KeyEff s l a) -> a
-\end{code}
-
-
-
-The second type argument of |KeyEff| gives the list of the types of keys that are created within the |KeyEff| computation. Binding concatenates the two types of keys, and |newKey| is a |KeyEff| computation creating a single key.
-
-
-
-
-
-
 \paragraph{Type safety}
 The first safety property that we conjecture the Key monad has is \emph{type safety}: |testEquality| will never allow us to proof |a :~: b| for two \emph{distinct} types. The informal agument is that each Key has one type associated with it, and a unique number, and hence if the numbers are the same the types must also be the same. The assumption that each Key has \emph{one} type associated with it is broken if we have  a (non-bottom) value of type |forall a. Key s a| for some specific |s|. This hypothetical value can be used to construct |unsafeCoerce :: a -> b| because it is a unique key for \emph{any} type. The argument why no non-bottom value of this type can be created by using the key monad is that we can only create new keys with |newKey| and the type |forall s. KeyM (forall a. Key s a)| does not unify with the type of |newKey|, namely |forall s a. KeyM (Key s a)|. For the same reason, it is also not possible to get polymorphic references, i.e. references of type |(forall a. IORef a)| in Haskell. Moreover, if the type of |runKeyM| is also crucial for type-safety. If its type was |KeyM s a -> a| instead of |(forall s. KeyM s a) -> a| we could create a polymorphic key with |runKeyM newKey :: forall a. Key s a|.
 
@@ -922,28 +901,52 @@ data Key s a where
 \end{code}
 A tricky bit here is that since a |Key| computation might create an infinite number of keys, this hypothetical datatype might have an infinite number of constructors. We conjecture that there is a variant of parametricity for Haskell extended the Key monad in which, like with GADTs, states that |boolBool| and |boolInt| above are indistuingishable. 
 
-\paragraph{Termination?}
+\paragraph{Termination}
+A fourth desirable property of a type system extension is preservation of termination. What this usually means is that type-safe programs that do not use recursion terminate. Haskell already breaks this property: even without term-level recursion, but allowing type-level recursion, we can create programs that do not terminate. But if we disallow covariant recursion on the type level (i.e.\ type-level recursive occurrences may not occur on the left of a function arrow), then all Haskell programs without term-level recursion do terminate.
 
+It turns out that adding the Key Monad actually breaks termination, even when we disallow covariant recursion on the type level and recursion at the term level. We show this by implementing a general fixpoint combinator without using covariant recursion at the type level.
+
+\begin{figure}
 \begin{code}
 data D s a
   = Fun (Box s -> D s a)
   | Val a
 
-apply :: Key s (D s a) -> D s a -> D s a -> D s a
-apply k (Fun f) x = f (Hide k x)
+lam :: Key s (D s a) -> (D s a -> D s a) -> D s a
+lam k f = Fun (f . fromJust . unlock k)
 
-unVal :: D s a -> a
-unVal (Val x) = x
-
-wrap :: Key s (D s a) -> (a -> a) -> D s a
-wrap k f = Fun (Val . f . unVal . unHide k)
+app :: Key s (D s a) -> D s a -> D s a -> D s a
+app k (Fun f) x = f (Lock k x)
 
 fix :: (a -> a) -> a
-fix f = runKeyM (do k <- newKey
-              let wf = Fun (\x -> apply k (wrap k f) (apply k (unlock k x) (unlock k x)))
-              return (u (apply k wf wf)))
+fix f = runKeyM
+  (do  k <- newKey
+       let f'   = lam k (Val . f . unVal)
+           xfxx = lam k (\x -> app k f' (app k x x))
+           fixf = app k xfxx xfxx
+       return (unVal fixf))
+ where
+  unVal (Val x) = x
 \end{code}
+\label{fig:fix}
+\caption{Implementing a general fixpoint combinator without term-level recursion nor type-level covariant recursion}
+\end{figure}
 
+In Fig.\ \ref{fig:fix} we show how this can be done. First, we introduce a datatype |D s a| for domains representing models of the untyped lambda calculus. (We are going to encode the standard fixpoint combinator |\f -> (\x -> f (x x)) (\x -> f (x x))| in this domain.) An element of |D s a| is either a function over |D s a| or a value of type |a|. Normally, we would use covariant recursion for the argument of |Fun|, but we are not allowed to, so we mask it by using a |Box s| instead. As a result, |D s a| is not covariantly recursive, and neither are any of its instances.
+
+Second, we introduce two helper functions: |lam|, which takes a function over the domain, and injects it as an element into the domain, and |app|, which takes two elements of the domain and applies the first argument to the second argument. Both need an extra argument of type |Key s (D s a)| to lock/unlock the forbidden recursive argument.
+
+Third, the fixpoint combinator takes a Haskell function |f|, wraps it onto the domain |D s a| resulting in a function |f'|, and then uses |lam| and |app| to construct a fixpoint combinator from the untyped lambda calculus. Lastly, we need to convert the result from the domain |D s a| back into Haskell-land using |unVal|.
+
+What this shows is that (1) adding the Key Monad to a terminating language may make it non-terminating, (2) the Key Monad is a genuine extension of Haskell without term-level recursion and type-level covariant recursion. Incidentally, this is also the case for the ST-monad.
+
+\section{Discussion on the ST-monad}
+
+The ST-monad was introduced in \cite{peyton-jones+launchbury} and contained some correctness statements and also a high-level description of a proof. The proof sketch mentions the use of parametricity, which is a doubtful proof technique to use because it is not established that parametricity still holds for a language with the ST-monad. A follow-up paper \cite{launchbury-sabry} mentions another problem with the first paper, in particular that implementations of the lazy ST-monad may actually generate the wrong result in a setting that is more eager. This paper claims to fix those issues with a new semantics and proof sketch. However, a bug in this correctness proof was discovered, which lead to a series of papers formalizing the treatment of different versions of encapsulating strict and lazy state threads in a functional language, culminating in \cite{sabry+moggi}. This paper gives different formulations of strict and lazy state threads, one of them corresponding to lazy state threads in Haskell. The aim of the paper is to establish {\em type safety} of state threads. However, the paper only provides a proof sketch of type safety for one of the formulations, and only claims type safety (without a proof) for the other ones.
+
+Even if type safety may now be considered to have been established by these papers, we are still left with referential transparency and abstraction safety. Referential transparency is quite tricky for actual implementations of the ST-monad since efficient implementations use global pointers. Abstraction safety is also very important because most people assume that parametricity in Haskell actually holds, without giving it a second thought that the ST-monad may destroy it.
+
+Now, we actually believe that the ST-monad (and also the Key Monad) is correct in all of these senses. But we have also realized that there exist no actual proofs of these statements in the literature. We think that the Key Monad, which is arguably simpler than the ST-monad, could be a first step on the way to prove the ST-monad correct.
 
 \bibliographystyle{apalike}
 \bibliography{refs}
