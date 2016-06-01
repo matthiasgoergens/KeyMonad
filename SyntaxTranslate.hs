@@ -7,23 +7,25 @@ import HFMap
 import Prelude hiding (lookup, id, (.), fst,snd, curry, uncurry)
 import Control.Category
 import Unsafe.Coerce
+import Control.Applicative hiding (empty)
 
-type Index = HIndex
 
 class Hoas f where
     lam :: (f a -> f b) -> f (a -> b)
     app :: f (a -> b) -> f a -> f b
 
 data PHoas f a where
-    Var :: f a -> PHoas f a
-    Lam :: (f a -> PHoas f b) -> PHoas f (a -> b)
-    App :: PHoas f (a -> b) -> PHoas f a -> PHoas f b
+    PVar :: f a -> PHoas f a
+    PLam :: (f a -> PHoas f b) -> PHoas f (a -> b)
+    PApp :: PHoas f (a -> b) -> PHoas f a -> PHoas f b
 
 instance Hoas (PHoas f) where
-    lam f = Lam (f . Var)
-    app = App
+    lam f = PLam (f . PVar)
+    app = PApp
 
 type ClosedPHoas a = forall f. PHoas f a
+
+
 
 data NSyn l a where
   NVar :: Index l a -> NSyn l a
@@ -38,15 +40,21 @@ data KeyLam s a where
   KLam :: Key s a -> KeyLam s b -> KeyLam s (a -> b)
   KApp :: KeyLam s (a -> b) -> KeyLam s a -> KeyLam s b
 
-newtype KeyMLam s a = KL (KeyM s (KeyLam s a))
+newtype HoasKey s a = HK { getExp :: KeyM s (KeyLam s a) }
 
-instance Hoas (KeyMLam s) where
-  lam f = KL $
+instance Hoas (HoasKey s) where
+  lam f = HK $
      do k <- newKey
-        let KL m = f (KL (pure $ KVar k))
-        b <- m
+        b <- getExp (f (HK (pure $ KVar k)))
         return $ KLam k b
-  app (KL f) (KL x) = KL $ KApp <$> f <*> x
+  app f x = HK $ KApp <$> getExp f <*> getExp x
+
+phoasToKey :: (forall v. PHoas v a) -> (forall s. KeyM s (KeyLam s a))
+phoasToKey v = getExp (go v) where
+  go :: PHoas (HoasKey s) a -> HoasKey s a
+  go (PVar v) = v
+  go (PLam f) = lam (go . f)
+  go (PApp f x) = app (go f) (go x)
 
 makeMorePrecise :: (forall s. KeyM s (KeyLam s x)) -> NSyn '[] x
 makeMorePrecise  m = runKeyM (toNSyn <$> m)
@@ -57,9 +65,9 @@ toNSyn = translate empty
 type FKeyMap = HFMap
 
 extend :: Key s h -> FKeyMap s (Index t) ->  FKeyMap s (Index (h ': t))
-extend k m = insert k HHead (pfmap HTail m)
+extend k m = insert k Head (pfmap Tail m)
 
-translate :: HFMap s (HIndex l) -> KeyLam s a -> NSyn l a
+translate :: HFMap s (Index l) -> KeyLam s a -> NSyn l a
 translate e (KVar v)   = NVar (e ! v)
 translate e (KLam k b) = NLam (translate (extend k e) b)
 translate e (KApp f x) = NApp (translate e f) (translate e x)

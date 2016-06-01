@@ -4,15 +4,17 @@ module HList where
 
 import Data.Type.Equality
 
+class PFunctor p where
+ pfmap :: (forall x. f x -> g x) -> p f -> p g
 
 data HList l where
   Nil   :: HList '[]
   HCons :: h -> HList t -> HList (h ': t)
 
 
-data TList f l where
-  TNil  :: TList f '[] 
-  (:::) :: f h -> TList f t -> TList f (h ': t)
+data TList l f where
+  TNil  :: TList '[] f
+  (:::) :: f h -> TList t f -> TList (h ': t) f
 
 instance TestEquality (Index l) where
   testEquality Head     Head     = Just Refl
@@ -27,13 +29,13 @@ hindex :: HList l -> Index l a -> a
 hindex (HCons h _) Head     = h
 hindex (HCons _ t) (Tail i) = hindex t i
 
-index :: TList f l -> Index l a -> f a
+index :: TList l f -> Index l a -> f a
 index (h ::: _) Head     = h
 index (_ ::: t) (Tail i) = index t i
 
-pfmap :: (forall x. f x -> g x) -> TList f l -> TList g l
-pfmap f TNil      = TNil
-pfmap f (h ::: t) = f h ::: pfmap f t
+instance PFunctor (TList l) where
+  pfmap f TNil      = TNil
+  pfmap f (h ::: t) = f h ::: pfmap f t
 
 {-
 hhead :: HFList f (h ': t) -> f h

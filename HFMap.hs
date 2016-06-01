@@ -4,6 +4,7 @@ module HFMap (HFMap, empty, insert,lookup,singleton, (!), pfmap) where
 import KeyM
 import Dynamic
 import Data.Maybe
+import HList 
 import qualified Data.IntMap.Lazy as I
 import Prelude hiding (lookup)
 
@@ -25,6 +26,5 @@ lookup k (HFMap m) =
 
 (!) :: HFMap s f -> Key s a -> f a
 m ! k = fromJust (lookup k m)
-
-pfmap :: (forall x. f x -> g x) -> HFMap s f -> HFMap s g
-pfmap f (HFMap m) = HFMap (fmap (fmapf f) m)
+instance PFunctor (HFMap s) where
+  pfmap f (HFMap m) = HFMap (fmap (fmapf f) m)

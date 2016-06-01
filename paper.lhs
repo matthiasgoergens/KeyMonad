@@ -88,7 +88,7 @@ Why is the Key Monad interesting? There are two separate reasons.
 
 First, decoupling the ability to combine different types into one computation from computations involving state, allows programmers to use the Key Monad in situations where the ST-monad would not have been suitable. In fact, the bulk of this paper presents examples of uses of the Key Monad that would have been impossible without |testEquality|.
 
-Second, the Key Monad is simpler than the ST-monad, because it does not involve global references, or any updatable state at all. We would like to argue that therefore, the Key Monad is easier to understand than the ST-monad. Moreover, given the Key Monad, the ST-monad is actually implementable in plain Haskell, albeit less time and memory efficient than the original ST-monad (so missing feature (1) above, but still providing feature (2) and (3)). So one could argue that, if one had to choose, the Key Monad would be the more desirable Haskell extension to pick.
+Second, the Key Monad is simpler than the ST-monad, because it does not involve global references, or any updatable state at all. We would like to argue that therefore, the Key Monad is easier to understand than the ST-monad. Moreover, given the Key Monad, the ST-monad is actually implementable in plain Haskell, albeit less time and memory efficient than the original ST-monad (so missing feature (1) above, but still providing feature (2) and (3)). So one could argue that, if one had to choose, the Key Monad would be the more desirable Haskell extension to pick.\atze{I'm not conviced, Key monad does not provide (1), remove this last sentence?}
 
 The second reason comes with a possibly unexpected twist.
 
@@ -264,7 +264,6 @@ This specialization does \emph{not} hold because, the left hand side type-checks
 
 \begin{figure}
   \rule{\columnwidth}{0.4pt}
-
 \begin{code}
 class Arrow a where
   arr    :: (x -> y) -> a x y
@@ -274,6 +273,8 @@ class Arrow a where
 \caption{The  arrow type class.}
 \label{arrowsdef}
 \end{figure}
+
+In this section, we show that the |Key| monad gives us the power to implement an \emph{embedded} form of \emph{arrow syntax}. Without the |Key| monad, such syntax is, as far as we know, only possible by using specialized compiler support.
 
 The |Arrow| type class, recalled in Figure \ref{arrowsdef}, was introduced by Hughes\cite{arrows} as an interface that is like monads, but which allows for more static information about the constructed computations to be extracted. However, in contrast to monads, arrows do not directly allow intermediate values to be \emph{named}, instead expressions must be written in \emph{point-free style}. As an example, an arrow computation which feeds the same input to two arrows, and adds their outputs, can be expressed in point free style as follows:
 \begin{code}
@@ -312,7 +313,7 @@ addA f g = proc $ \z -> do
 \end{code}
 We use a function conviently called |proc| and use an infix function conviently called |(-<)|.
 
-The difference between |do| notation and |proc| notation is that in |proc| notation, one cannot observe intermediate values to decide what to do next. For example, we \emph{cannot} do the following:
+The difference between |do| notation and arrow notation is that in arrow notation, one cannot observe intermediate values to decide what to do next. For example, we \emph{cannot} do the following:
 \begin{code}
 ifArrow ::  a Int x -> a Int x -> a Int x
 ifArrow t f = procb z -> do
@@ -320,12 +321,14 @@ ifArrow t f = procb z -> do
      0 -> t -< z
      _ -> f -< z
 \end{code}
-Allowing this kind of behavior would make it impossible to translate |proc| notation to arrows, because this is exactly the power that monads have but that arrows lack \cite{idiomarrmonad}. To mimic this restriction in our embedded arrow notation, our function |(-<)| has the following type:
+Allowing this kind of behavior would make it impossible to translate arrow notation to arrows, because this is exactly the power that monads have but that arrows lack \cite{idiomarrmonad}. To mimic this restriction in our embedded arrow notation, our function |(-<)| has the following type:
 \begin{code}
 (-<) :: Arrow a => a x y -> Cage s x -> 
               ArrowSyn s (Cage s y)
 \end{code}
-Where |ArrowSyn| is the monad which we use to define our embedded arrow notation. The input and output of the arrow computations are enclosed in |Cage|s, which are named thusly because a value of type |Cage s x| does not allow observation of the value of the type |x| it ``contains''. The implementation of a |Cage| is as follows:
+Where |ArrowSyn| is the monad which we use to define our embedded arrow notation. The input and output of the arrow computations are enclosed in |Cage|s, which are named thusly because a value of type |Cage s x| does not allow observation of the value of the type |x| it ``contains''. 
+
+The implementation of a |Cage| is as follows:
 \begin{code}
 newtype Cage s x = Cage { liberate :: KeyMap s -> x }
   deriving (Functor, Applicative)
@@ -357,7 +360,7 @@ instance Arrow a => Monoid (EndoA a x) where
 \end{code}
 The standard writer monad transformer, |WriterT|, produces |mempty| for |return|, and composes the built values from from the left and right hand side of |>>=| using |mappend|, giving us precisely what we need for building arrows. 
 
-The |KeyMap| in this construction functions as an \emph{enviroment}, each result of an arrow notation via |(-<)| has its own name (|Key|), and a |Cage| is an expression, i.e. a function from enviroment to value, which may lookup names in the enviroment. The |Key| monad and the |KeyMap| allow us to model \emph{hetrogenous} enviroments which can be extended \emph{without changing} the \emph{type} of the enviroment. This is exactly the extra power we need to define this translation. 
+The |KeyMap| in this construction functions as an \emph{enviroment}, each result of an arrow via |(-<)| has its own name (|Key|), and a |Cage| is an expression, i.e. a function from enviroment to value, which may lookup names in the enviroment. The |Key| monad and the |KeyMap| allow us to model \emph{hetrogenous} enviroments which can be extended \emph{without changing} the \emph{type} of the enviroment. This is exactly the extra power we need to define this translation. 
 
 
 
@@ -439,14 +442,12 @@ class RelMonad m v where
   rreturn :: v x -> m x
   (.>>=)  :: m x -> (v x -> m y) -> m y
 \end{code}
-The only difference with the regular monad type class is that the values are now wrapped in a type constructor |v|. The laws are also the same. Relative monads are a generalization of monads, because each monad can be made a relative monad by setting |v| to |Id|. 
-We can construct a similar construction as |ArrowSyn| as follows:
+The only difference with the regular monad type class is that the values are now wrapped in a type constructor |v|. We can construct a similar construction as |ArrowSyn| as follows:
 \begin{code}
 data ArrowRm a s x = ArrowRm 
          (ArrowSyn a s (Cage s x))
 instance RelMonad (ArrowRm a s) (Cage s) where ...
 \end{code}
-
 Altenkrich\cite{relmonad} shows that in category theory arrows are a special case of relative monads, but his construction is not a relative monad in Haskell. In particular his definition of bind does not allow us freely use bound values, instead it requires us to manually lift values into scope, in the same fashion as directly using de Bruijn indices. Our construction suggests that arrows are also a special case of relative monad in Haskell with the key monad, but a formal proof is outside the scope of this paper.
 
 The \emph{Arrow Calculus}\cite{arrowcalc} describes a translation of a form of arrow syntax (not embedded in Haskell) to arrows which is very simillar to the construction presented here. Their calculus has five laws, three of which can be considered to be relative monad laws, which they use to prove the equational correspondance between their calculus and regular arrows. Due to the simillarity, their paper should provide a good starting point for anyone trying to prove the same for this construction.
@@ -492,19 +493,16 @@ class Hoas f where
   lam :: (f a -> f b)  -> f (a -> b)
   app :: f (a -> b)    -> (f a -> f b)
 
-newtype HoasExp s a = 
-  He { getExp :: KeyM s (KExp s a) }
+newtype HoasKey s a = 
+  HK { getExp :: KeyM s (KExp s a) }
 
 instance Hoas (HoasExp s) where
-  lam f = He $ do  k <- newKey 
-                   b <- getExp (f (He (Var k)))
-                   return (Lam k b)
-  app f x = He $ App <$> getExp f <*> getExp x
+  lam f    = HK $ do  k <- newKey 
+                      b <- getExp (f (He (Var k)))
+                      return (Lam k b)
+  app f x  = HK $ App <$> getExp f <*> getExp x
 \end{code}
-For instance, the lambda term |(\x y -> x)| can now be constructed with:
-\begin{code}
-lam (\x -> lam (\y -> x))
-\end{code}
+For instance, the lambda term |(\x y -> x)| can now be constructed with: |lam (\x -> lam (\y -> x))|
 
 \subsection{Translating well-scoped representations}
 
@@ -525,7 +523,7 @@ phoasExample = PLam (\x -> PLam (\y -> x))
 \end{code}
 An attractive property of Parametric HOAS is that we use Haskell binding to construct syntax, and that terms of type |(forall v. Phoas v a)| are always well-scoped\cite{phoas}.
 
-The second way to ensure well-scopedness is to use typed de Bruijn indices. We present our own modern variant of this technique using Data Kinds and GADTs, but the idea is essentially the same as presented by Bird and Paterson \cite{nested}. Our representation of typed de Bruijn indices is an index in a hetrogenous list. In Figure \ref{heteros} we show definitions for heterogenous lists and indicices in them. A typed de Bruijn index of type |Index l a| is an index for a variable of type |a| in an enviroment where the types of the variables are represented by the type level list |l|. We can use these indices to represent lambda terms as follows:
+The second way to ensure well-scopedness is to use typed de Bruijn indices. We present our own modern variant of this technique using Data Kinds and GADTs, but the idea is essentially the same as presented by Bird and Paterson \cite{nested}. Our representation of typed de Bruijn indices is an index in a hetrogenous list (Figure \ref{heteros}). A typed de Bruijn index of type |Index l a| is an index for a variable of type |a| in an enviroment where the types of the variables are represented by the type level list |l|. We can use these indices to represent lambda terms as follows:
 \begin{code}
 data Bruijn l a where
   BVar  :: Index l a -> Bruijn l a
@@ -540,17 +538,17 @@ data Index l a where
   Head  :: Index (h : t) h
   Tail  :: Index t x -> Index (h : t) x
 
-data TList f l where
-  TNil  :: TList f [] 
-  (:::) :: f h -> TList f t -> TList f (h : t)
+data TList l f where
+  TNil  :: TList [] f
+  (:::) :: f h -> TList t f -> TList (h : t) f
 
-index :: TList f l -> Index l a -> f a
+index :: TList l f -> Index l a -> f a
 index (h ::: _) Head     = h
 index (_ ::: t) (Tail i) = index t i
 
-pfmapl :: (forall x. f x -> g x) -> TList f l -> TList g l
-pfmapl f TNil      = TNil
-pfmapl f (h ::: t) = f h ::: pfmapl f t
+instance PFunctor (TList l) where
+  pfmap f TNil      = TNil
+  pfmap f (h ::: t) = f h ::: pfmap f t
 \end{code}
 \caption{Heterogenous list and indexes in them.}
 \label{heteros}
@@ -564,17 +562,14 @@ This seems to be not only be impossible in Haskell without extensions, but in de
 
 The well-scopedness of variables in a |Bruijn| value follows from the fact that the value is well-typed. With |PHoas|, the well-scopedness relies on the meta-level (i.e. not formalized through types) argument that no well-scoped values can be created by using the |PHoas| interface. The internal (i.e. formalized through types) well-scopedness of |Bruijn|, allows interpretations of syntax which seem to not be possible if we are using terms constructed with |PHoas|. As an example of this, consider translating lambda terms to \emph{cartesian closed category} combinators (the categorical version of the lambda calculus). This can be done if the lambda terms are given as |Bruijn| values, as demonstrated in Figure \ref{ccc}. Without the Key monad, there seem to be no way to do the same for terms constructed with the PHoas terms.
 
-The |Key| monad allows us to implement |phoasToBruijn|. This translation works by first translating |PHoas| to the |KExp| from the previous subsection, and then translating that to typed de bruijn indices. The first step in this translation is straightforwardly defined as follows: 
+Our implementation of |phoasToBruijn| works by first translating |PHoas| to the |KExp| from the previous subsection, and then translating that to typed de bruijn indices. The first step in this translation is straightforwardly defined using the |Hoas| interface from the previous subsection: 
 \begin{code}
-phoasToKey ::  (forall v. PHoas v a) -> 
-               (forall s. KeyM (KExp s a))
-phoasToKey t = go t where
-  go :: PHoas (Key s) a -> KeyM s (KLam s a)
-  go (PVar x)    = return (KVar x)
-  go (PLam f)    = do  v <- newKey
-                       b <- go (f v)
-                       return (KLam v b)
-  go (PApp f x)  = KApp <$> go f <*> go x
+phoasToKey :: (forall v. PHoas v a) -> (forall s. KeyM s (KeyLam s a))
+phoasToKey v = getExp (go v) where
+  go :: PHoas (HoasKey s) a -> HoasKey s a
+  go (PVar v) = v
+  go (PLam f) = lam (go . f)
+  go (PApp f x) = app (go f) (go x)
 \end{code}
 
 We will now show how we can create a function of type:
@@ -584,8 +579,8 @@ keyToBruijn :: KExp s a -> Bruijn [] a
 Using this function, we can then implement |phoasToBruijn| as follows:
 \begin{code}
 phoasToBruijn :: (forall v. PHoas v x) -> Bruijn [] x
-phoasToBruijn p = runKeyM 
-   (keyToBruijn <$> phoasToKey p)
+phoasToBruijn p = 
+  runKeyM (keyToBruijn <$> phoasToKey p)
 \end{code}
 To implement the |keyToBruijn| function, we need a variant of the |Box| we saw previously:
 \begin{code}
@@ -598,62 +593,60 @@ funlock k (FLock k' x) =
     Just Refl  -> Just x
     Nothing    -> Nothing
 \end{code}
-The difference with |Box| is that we now store values of type |f a| instead of values of type |a| in the box. We can provide a variant of |fmap| for this container:
+The difference with |Box| is that we now store values of type |f a| instead of values of type |a| in the box. We provide a variant of |fmap| for this container:
 \begin{code}
-pfmap :: (forall x. f x -> g x) -> p f -> p g
-pfmap f (FLock k x) = FLock k (f x)
+class PFunctor p where
+  pfmap :: (forall x. f x -> g x) -> p f -> p g
+
+instance PFunctor (FBox s) where
+  pfmap f (FLock k x) = FLock k (f x)
 \end{code} We also need a variant of the |KeyMap|, where we store |FBox|es instead of regular boxes:
 \begin{code}
 newtype FKeyMap s f = FKm [FBox s f]
 insert :: Key s a -> f a -> FKeyMap s f  -> FKeyMap s f
 lookup :: Key s a -> FKeyMap s f -> Maybe (f a)
-\end{code}
-We also provide an instance for |PFunctor| for this datatype:
-\begin{code}
-pfmapkm :: (forall x. f x -> g x) -> 
-           FKeyMap s f -> FKeyMap s g
-pfmapkm f (FKm m) = FKm (fmap (pfmap f) m)
+instance PFunctor (FKeyMap s)
 \end{code}
 
-We store the current ``environment'' as a |FKeyMap| mapping each |Key| to an |Index| in the current enviroment. When we enter a lambda-body, we need to extend the enviroment with a new name mapping to the de Bruijn index |HHead|, and add one lookup step to each other de Bruijn index currently in the |FKeyMap|. This is be done as follows:
+We store the current ``environment'' as a |FKeyMap| mapping each |Key| to an |Index| in the current enviroment. When we enter a lambda-body, we need to extend the enviroment with a new name mapping to the de Bruijn index |Head|, and add one lookup step to each other de Bruijn index currently in the |FKeyMap|. This is be done as follows:
 \begin{code}
 extend :: Key s h -> FKeyMap s (Index t) ->
             FKeyMap s (Index (h : t))
-extend k m = insert k HHead (pfmapkm HTail m)
+extend k m = insert k Head (pfmap Tail m)
 \end{code}
 With this machinery in place, we can translate |KExp| to |Bruijn| as follows:
 \begin{code}
 keyToBruijn :: KExp s a -> Bruijn [] a
 keyToBruijn = go empty where
-  go :: HFMap s (HIndex l) -> KExp s x -> Bruijn l x
-  go e (KVar v)   = NVar (e ! v)
-  go e (KLam k b) = NLam (go (extend k e) b)
-  go e (KApp f x) = NApp (go e f) (go e x)
+  go :: FKeyMap s (Index l) -> KExp s x -> Bruijn l x
+  go e (KVar v)    = NVar (e ! v)
+  go e (KLam k b)  = NLam (go (extend k e) b)
+  go e (KApp f x)  = NApp (go e f) (go e x)
 \end{code}
 
 Note that |keyToBruijn| fails if the input |KExp| is ill-scoped. This will never happen when |keyToBruijn| is called from |phoasToBruijn| because |phoasToKey| will always give well-scoped values of type |KExp|. This relies on the meta-level argument that values of type |PHoas| are always well-scoped. We stress that hence the key monad extension \emph{cannot} serve as a replacement of well-scopedness axiom used in a dependently typed setting. 
 
 
-
-
-
-
 \begin{figure}
 \begin{code}
-toClosed :: CCC c => Bruijn [] (x -> y) -> c () (x -> y)
-toClosed p = go p TNil where
-  go :: CCC c => Bruijn l y -> TList l (c x) -> c x y
-  go (BVar x)    e = index e x
-  go (BLam b)    e = 
-    curry $ go b (snd ::: pfmapl (. fst) e)
-  go (BApp f x)  e = uncurry (go f e) . prod id (go x e)
-
 class Category c => CCC c where
     prod     :: c x a -> c x b -> c x (a,b)
     fst      :: c (a,b) a
     snd      :: c (a,b) b
     curry    :: c (a,b) x -> c a (b -> x)
     uncurry  :: c a (b -> x) -> c (a,b) x
+
+toClosed :: CCC c => Bruijn [] (x -> y) -> c () (x -> y)
+toClosed p = go p TNil where
+  go :: CCC c => Bruijn l y -> TList l (c x) -> c x y
+  go (BVar x)    e = index e x
+  go (BLam b)    e = 
+    curry $ go b (snd ::: HK (. fst) e)
+  go (BApp f x)  e = uncurry (go f e) . prod id (go x e)
+
+instance PFunctor (TList l) where
+  pfmap f TNil      = TNil
+  pfmap f (h ::: t) = f h ::: pfmap f t
 \end{code}
 \label{ccc}
 \caption{Translating lambda terms to cartesian closed categories.}
@@ -805,7 +798,7 @@ Note that in the implementation |runKeyIm| now uses the universally quantified t
 
 While we have succeeded in avoiding |unsafeCoerce|, this construction is \emph{less powerfull} than the regular key monad because the types of the keys which are going to be created must now be \emph{statically known}. All example use cases of the key monad in this paper rely on the fact that the type of the keys which are going to be created do not have to be statically know. For example, we cannot implement a translation from parametric Hoas to de Bruijn indices with |KeyIm|, because the type of the keys which will have to be created is precisely the information that a parametric HOAS representation lacks.
 
-\subsection{Relation between implementations}
+\subsection{Attempting to recover the |Key| monad}
 
 Can we formalize the invariant and keep the interface the same? An obvious attempt at this is hiding the extra type of |KeyIm|:
 \begin{code}
@@ -824,10 +817,11 @@ runKeyM :: (exists p. forall s. KeyIm s p a) -> a
 \end{code}
 These types are \emph{not} equivalent: the latter implies the former, but not the other way around. In the former, the type which is bound to |p| may depend on |s|, which cannot happen in the latter. 
 
- If the types of all keys which are created do not mention |s|, we do not for example create a key of type |Key s (Key s a)|, then one could argue that coercing the computation from the former to the latter is perfectly safe. However, if we create a key where the type does mention |s| then gives rises to \emph{cyclic} types , for example 
+ If the types of all keys which are created do not mention |s|, we do not for example create a key of type |Key s (Key s a)|, then one could argue that coercing the computation from the former to the latter is perfectly safe. However, if we create a key of type |Key s (Key s Int)|, then when the type |s| is unified with the tree of types of the keys, this gives rise to a \emph{cyclic} type:
 \begin{code}
 s ~ (Key s Int) :++: t
-\end{code} Allowing such keys, where the type of the key mentions |s|, allows us to write |fix| without recursion, as demonstrated in the next section. Apart from that, is seem that this particular cyclic type does not do any harm (we already had nontermination in Haskell), and it is likely to be safe to coerce the first type of |runKeyM| to the latter. However, it is highly unlikely that we can formulalize this through types that this coercion is safe: the Haskell type system does not allow cyclic types. Even if it did, it is unclear to us how to prove that this coercion is safe.
+\end{code} 
+Allowing such keys, where the type of the key mentions |s|, allows us to write |fix| without recursion, as demonstrated in the next section. Apart from that, is seem that this particular cyclic type does not do any harm (we already had nontermination in Haskell), and it is likely to be safe to coerce the first type of |runKeyM| to the latter. However, it is highly unlikely that we can formulalize this through types that this coercion is safe: the Haskell type system does not allow cyclic types. Even if it did, it is unclear to us how to prove that this coercion is safe.
 
 For |join| other problems arise. We need a implementation of type:
 \begin{code}
