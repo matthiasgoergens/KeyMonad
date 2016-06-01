@@ -82,7 +82,7 @@ In this paper, we attempt to provide a new abstraction in Haskell that only prov
 
 The Key Monad |KeyM| is basically a crippled version of the |ST|-monad: we can monadically create keys of type |Key s a| using the function |newKey|, but we cannot read or write values to these keys; in fact, keys do not carry any value at all. We can convert a computation in |KeyM| into a pure value by means of |runKeyM|, which requires the computation to be polymorphic in |s|, just like |runST| would.
 
-The only new feature is the function |testEquality|, which compares two keys for equality. But the keys do not have to be of the same type! They just have to come from the same |KeyM| computation, indicated by the |s| argument. If two keys are not equal, the answer is |Nothing|. However, if two keys are found to be equal, {\em then their types should also be the same}, and the answer is |Just Refl|, where |Refl| is a constructor from the GADT |a :~: b| that functions as the ``proof'' that |a| and |b| are in fact the same type\footnote{It is actually possible to add |testEquality| to the standard interface of |STRef|s, which would provide much the same features in the ST-monad as the Key Monad would, apart from some laziness issues\atze{Which laziness issues? I don't think there are any.}\koen{Yes: the lazy ST-monad is not as lazy as the name supply implementation}\atze{Example?}. However, because of its simplicity, we think the Key Monad is interesting in its own right. See also \ref{sec:discussion}.}.
+The only new feature is the function |testEquality|, which compares two keys for equality. But the keys do not have to be of the same type! They just have to come from the same |KeyM| computation, indicated by the |s| argument. If two keys are not equal, the answer is |Nothing|. However, if two keys are found to be equal, {\em then their types should also be the same}, and the answer is |Just Refl|, where |Refl| is a constructor from the GADT |a :~: b| that functions as the ``proof'' that |a| and |b| are in fact the same type\footnote{It is actually possible to add |testEquality| to the standard interface of |STRef|s, which would provide much the same features in the ST-monad as the Key Monad would, apart from some laziness issues\atze{Which laziness issues? I don't think there are any.}\koen{Yes: the lazy ST-monad is not as lazy as the name supply implementation}\atze{Example? I've tested it, and |undefinded >> m == m| does hold for the \emph{lazy} ST monad.}. However, because of its simplicity, we think the Key Monad is interesting in its own right. See also \ref{sec:discussion}.}.
 
 Why is the Key Monad interesting? There are two separate reasons.
 
@@ -665,9 +665,7 @@ class Category c => CCC c where
 
 \section{Implementing the Key monad}
 
-\atze{What do you guys think about this section?}
-
-The |Key| monad seems to be a perfectly safe thing, but it seems that it is not expressible in Haskell directly. Why?
+The |Key| monad seems to be a perfectly safe thing, but it seems that it is not expressible in Haskell directly. In this section, we show how the key monad can be implemented using |unsafeCoerce|, and 
 
 To try to answer this question, we first discuss an implementation of the |Key| monad in Haskell which uses |unsafeCoerce|. To explore how far we can get without |unsafeCoerce|, we then discuss a weaker construction, called the Key paramateric effect monad. We then explore the relation between the two, which gives another way of thinking about the implementation of the |Key| monad.
 
