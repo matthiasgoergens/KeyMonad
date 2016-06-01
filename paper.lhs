@@ -185,10 +185,7 @@ Hence, another way to think of this paper is that we claim that the above functi
 
 It \emph{is} possible to implement a similar, but weaker, version of |testEquality| using only the standard |ST|-monad functions. If we represent keys of type |Key s a| as a pair of an identifier and an |STRef|s containing values of type |a|, then we can create a function that casts a value of type |a| to |b|, albeit monadically.
 \begin{code}
-data Key s a =
-  Key  {  ident  :: STRef s ()
-       ,  ref    :: STRef s a
-       }
+data Key s a = Key{ ident :: STRef s (), ref :: STRef s a }
 
 testEqualityM :: Key s a -> Key s b -> Maybe (a -> ST s b)
 testEqualityM ka kb
