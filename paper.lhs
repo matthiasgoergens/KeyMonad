@@ -518,7 +518,7 @@ In Parametric HOAS, typed lambda terms are represented by the following data typ
 data Phoas v a where
   PVar  :: v a -> Phoas v a
   PLam  :: (v a -> Phoas v b) -> Phoas v (a -> b)
-  PApp  :: Phoas v (a -> b) -> Phoas v a -> PHoas b
+  PApp  :: Phoas v (a -> b) -> Phoas v a -> Phoas b
 \end{code}
 The reading of the type parameter |v| is the type of \emph{variables}.
 For example, the lambda term |(\x y -> x)| can be constructed as follows:
@@ -618,7 +618,7 @@ pfmapkm :: (forall x. f x -> g x) ->
 pfmapkm f (FKm m) = FKm (fmap (pfmap f) m)
 \end{code}
 
-We store the current ``enviroment'' as a |FKeyMap| mapping each |Key| to an |Index| in the current enviroment. When we enter a lambda-body, we need to extend the enviroment with a new name mapping to the de Bruijn index |HHead|, and add one lookup step to each other de Bruijn index currently in the |FKeyMap|. This is be done as follows:
+We store the current ``environment'' as a |FKeyMap| mapping each |Key| to an |Index| in the current enviroment. When we enter a lambda-body, we need to extend the enviroment with a new name mapping to the de Bruijn index |HHead|, and add one lookup step to each other de Bruijn index currently in the |FKeyMap|. This is be done as follows:
 \begin{code}
 extend :: Key s h -> FKeyMap s (Index t) ->
             FKeyMap s (Index (h : t))
