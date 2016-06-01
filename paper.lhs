@@ -927,28 +927,44 @@ data Key s a where
 \end{code}
 A tricky bit here is that since a |Key| computation might create an infinite number of keys, this hypothetical datatype might have an infinite number of constructors. We conjecture that there is a variant of parametricity for Haskell extended the Key monad in which, like with GADTs, states that |boolBool| and |boolInt| above are indistuingishable. 
 
-\paragraph{Termination?}
+\paragraph{Termination}
+A fourth desirable property of a type system extension is preservation of termination. What this usually means is that type-safe programs that do not use recursion terminate. Haskell already breaks this property: even without term-level recursion, but allowing type-level recursion, we can create programs that do not terminate. But if we disallow covariant recursion on the type level (i.e.\ type-level recursive occurrences may not occur on the left of a function arrow), then all Haskell programs without term-level recursion do terminate.
 
+It turns out that adding the Key Monad actually breaks termination, even when we disallow covariant recursion on the type level and recursion at the term level. We show this by implementing a general fixpoint combinator without using covariant recursion at the type level.
+
+\begin{figure}
 \begin{code}
 data D s a
   = Fun (Box s -> D s a)
   | Val a
 
-apply :: Key s (D s a) -> D s a -> D s a -> D s a
-apply k (Fun f) x = f (Hide k x)
+lam :: Key s (D s a) -> (D s a -> D s a) -> D s a
+lam k f = Fun (f . fromJust . unlock k)
 
-unVal :: D s a -> a
-unVal (Val x) = x
-
-wrap :: Key s (D s a) -> (a -> a) -> D s a
-wrap k f = Fun (Val . f . unVal . unHide k)
+app :: Key s (D s a) -> D s a -> D s a -> D s a
+app k (Fun f) x = f (Lock k x)
 
 fix :: (a -> a) -> a
-fix f = runKeyM (do k <- newKey
-              let wf = Fun (\x -> apply k (wrap k f) (apply k (unlock k x) (unlock k x)))
-              return (u (apply k wf wf)))
+fix f = runKeyM
+  (do  k <- newKey
+       let f'   = lam k (Val . f . unVal)
+           xfxx = lam k (\x -> app k f' (app k x x))
+           fixf = app k xfxx xfxx
+       return (unVal fixf))
+ where
+  unVal (Val x) = x
 \end{code}
+\label{fig:fix}
+\caption{Implementing a general fixpoint combinator without term-level recursion nor type-level covariant recursion}
+\end{figure}
 
+In Fig.\ \ref{fig:fix} we show how this can be done. First, we introduce a datatype |D s a| for domains representing models of the untyped lambda calculus. (We are going to encode the standard fixpoint combinator |\f -> (\x -> f (x x)) (\x -> f (x x))| in this domain.) An element of |D s a| is either a function over |D s a| or a value of type |a|. Normally, we would use covariant recursion for the argument of |Fun|, but we are not allowed to, so we mask it by using a |Box s| instead. As a result, |D s a| is not covariantly recursive, and neither are any of its instances.
+
+Second, we introduce two helper functions: |lam|, which takes a function over the domain, and injects it as an element into the domain, and |app|, which takes two elements of the domain and applies the first argument to the second argument. Both need an extra argument of type |Key s (D s a)| to lock/unlock the forbidden recursive argument.
+
+Third, the fixpoint combinator takes a Haskell function |f|, wraps it onto the domain |D s a| resulting in a function |f'|, and then uses |lam| and |app| to construct a fixpoint combinator from the untyped lambda calculus. Lastly, we need to convert the result from the domain back into Haskell-land using |unVal|.
+
+What this shows is that (1) adding the Key Monad to a terminating language may make it non-terminating, (2) the Key Monad is a genuine extension of Haskell without term-level recursion and type-level covariant recursion. Incidentally, this is also the case for the ST-monad.
 
 \bibliographystyle{apalike}
 \bibliography{refs}
