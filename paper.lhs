@@ -854,15 +854,6 @@ While the above reasoning does not consitite a formal proof of the safety of the
 
 \section{Safety of the |Key| monad}
 
-\subsection{Why adding extra types is not good enough}
-
-\begin{code}
-newKey :: KeyEff s [a] (Key s a)
-runKeyEff :: (forall s. KeyEff s l a) -> a
-\end{code}
-
-The second type argument of |KeyEff| gives the list of the types of keys that are created within the |KeyEff| computation. Binding concatenates the two types of keys, and |newKey| is a |KeyEff| computation creating a single key.
-
 \paragraph{Type safety}
 The first safety property that we conjecture the Key monad has is \emph{type safety}: |testEquality| will never allow us to proof |a :~: b| for two \emph{distinct} types. The informal agument is that each Key has one type associated with it, and a unique number, and hence if the numbers are the same the types must also be the same. The assumption that each Key has \emph{one} type associated with it is broken if we have  a (non-bottom) value of type |forall a. Key s a| for some specific |s|. This hypothetical value can be used to construct |unsafeCoerce :: a -> b| because it is a unique key for \emph{any} type. The argument why no non-bottom value of this type can be created by using the key monad is that we can only create new keys with |newKey| and the type |forall s. KeyM (forall a. Key s a)| does not unify with the type of |newKey|, namely |forall s a. KeyM (Key s a)|. For the same reason, it is also not possible to get polymorphic references, i.e. references of type |(forall a. IORef a)| in Haskell. Moreover, if the type of |runKeyM| is also crucial for type-safety. If its type was |KeyM s a -> a| instead of |(forall s. KeyM s a) -> a| we could create a polymorphic key with |runKeyM newKey :: forall a. Key s a|.
 
