@@ -941,9 +941,17 @@ In Fig.\ \ref{fig:fix} we show how this can be done. First, we introduce a datat
 
 Second, we introduce two helper functions: |lam|, which takes a function over the domain, and injects it as an element into the domain, and |app|, which takes two elements of the domain and applies the first argument to the second argument. Both need an extra argument of type |Key s (D s a)| to lock/unlock the forbidden recursive argument.
 
-Third, the fixpoint combinator takes a Haskell function |f|, wraps it onto the domain |D s a| resulting in a function |f'|, and then uses |lam| and |app| to construct a fixpoint combinator from the untyped lambda calculus. Lastly, we need to convert the result from the domain back into Haskell-land using |unVal|.
+Third, the fixpoint combinator takes a Haskell function |f|, wraps it onto the domain |D s a| resulting in a function |f'|, and then uses |lam| and |app| to construct a fixpoint combinator from the untyped lambda calculus. Lastly, we need to convert the result from the domain |D s a| back into Haskell-land using |unVal|.
 
 What this shows is that (1) adding the Key Monad to a terminating language may make it non-terminating, (2) the Key Monad is a genuine extension of Haskell without term-level recursion and type-level covariant recursion. Incidentally, this is also the case for the ST-monad.
+
+\section{Discussion on the ST-monad}
+
+The ST-monad was introduced in \cite{peyton-jones+launchbury} and contained some correctness statements and also a high-level description of a proof. The proof sketch mentions the use of parametricity, which is a doubtful proof technique to use because it is not established that parametricity still holds for a language with the ST-monad. A follow-up paper \cite{launchbury-sabry} mentions another problem with the first paper, in particular that implementations of the lazy ST-monad may actually generate the wrong result in a setting that is more eager. This paper claims to fix those issues with a new semantics and proof sketch. However, a bug in this correctness proof was discovered, which lead to a series of papers formalizing the treatment of different versions of encapsulating strict and lazy state threads in a functional language, culminating in \cite{sabry+moggi}. This paper gives different formulations of strict and lazy state threads, one of them corresponding to lazy state threads in Haskell. The aim of the paper is to establish {\em type safety} of state threads. However, the paper only provides a proof sketch of type safety for one of the formulations, and only claims type safety (without a proof) for the other ones.
+
+Even if type safety may now be considered to have been established by these papers, we are still left with referential transparency and abstraction safety. Referential transparency is quite tricky for actual implementations of the ST-monad since efficient implementations use global pointers. Abstraction safety is also very important because most people assume that parametricity in Haskell actually holds, without giving it a second thought that the ST-monad may destroy it.
+
+Now, we actually believe that the ST-monad (and also the Key Monad) is correct in all of these senses. But we have also realized that there exist no actual proofs of these statements in the literature. We think that the Key Monad, which is arguably simpler than the ST-monad, could be a first step on the way to prove the ST-monad correct.
 
 \bibliographystyle{apalike}
 \bibliography{refs}
