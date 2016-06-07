@@ -497,7 +497,7 @@ data TExp a where
   Lam  :: Name -> TExp b -> TExp (a -> b)
   App  :: TExp (a -> b) -> TExp a -> TExp b
 \end{code}
-We cannot do much with this datatype: if we, for example, want to write an interpreter, then there is no type-safe way to represent the enviroment: we need to map names to values of different types, but there is no type-safe way to do so.
+We cannot do much with this datatype. If we, for example, want to write an interpreter, then there is no way to represent the environment: we need to map names to values of different types, but there is no type-safe way to do so.
 
 With the |Key| monad, we \emph{can} extend this simple naming approach to typed representations. Consider the following data type:
 \begin{code}
@@ -525,7 +525,7 @@ For instance, the lambda term |(\x y -> x)| can now be constructed with: |lam (\
 
 \subsection{Translating well-scoped representations}
 
-The datatype |KExp| does not ensure that any value of type |KExp| is well-scoped. As far as we know, there two are approaches to constructing datatypes for syntax which ensure that every value is well-scoped.  The first is Parametric Higher Order Abstract Syntax (HOAS)\cite{hoas, phoas, ags, graphs}, and the second is using typed de Bruijn indices\cite{nested}. However, there seems to be no way type-safe way to translate terms created with a PHoas term to typed de Bruijn indices, but the Key monad allows us to cross this chasm.
+The datatype |KExp| does not ensure that any value of type |KExp| is well-scoped. As far as we know, there two are approaches to constructing datatypes for syntax which ensure that every value is well-scoped.  The first is Parametric Higher Order Abstract Syntax (HOAS)\cite{phoas, ags, graphs}, and the second is using typed de Bruijn indices\cite{nested}. However, there seems to be no way type-safe way to translate terms created with a PHoas term to typed de Bruijn indices, but the Key monad allows us to cross this chasm.
  
 In Parametric HOAS, typed lambda terms are represented by the following data type:
 \begin{code}
@@ -573,15 +573,15 @@ instance PFunctor (TList l) where
 \label{heteros}
 \end{figure}
 
-The types |(forall v. PHoas v a)| and |(Bruijn [] a)| both represent well-scoped typed lambda terms (and |undefined|), and translating from the latter to the former is straightforward. However, there seems to be no way to translate the former to the latter, without using extensions such as the |Key| monad. In other words there seems to be no function of type:
+The types |(forall v. Phoas v a)| and |(Bruijn [] a)| both represent well-scoped typed lambda terms (and |undefined|), and translating from the latter to the former is straightforward. However, there seems to be no way to translate the former to the latter, without using extensions such as the |Key| monad. In other words there seems to be no function of type:
 \begin{code}
-phoasToBruijn :: (forall v. PHoas v a) -> Bruijn [] a
+phoasToBruijn :: (forall v. Phoas v a) -> Bruijn [] a
 \end{code} 
-This seems to be not only be impossible in Haskell without extensions, but in dependently typed languages without extensions as well. When using |PHoas| in \emph{Coq} to prove properties about programming languages, an small extension to the logic in the form of a special well-scopedness axiom for the |PHoas| datatype is needed to translate PHoas to de Bruijn indices\cite{phoas}.
+This seems to be not only be impossible in Haskell without extensions, but in dependently typed languages without extensions as well. When using |Phoas| in \emph{Coq} to prove properties about programming languages, an small extension to the logic in the form of a special well-scopedness axiom for the |Phoas| datatype is needed to translate Phoas to de Bruijn indices\cite{phoas}.
 
-The well-scopedness of variables in a |Bruijn| value follows from the fact that the value is well-typed. With |PHoas|, the well-scopedness relies on the meta-level (i.e. not formalized through types) argument that no well-scoped values can be created by using the |PHoas| interface. The internal (i.e. formalized through types) well-scopedness of |Bruijn|, allows interpretations of syntax which seem to not be possible if we are using terms constructed with |PHoas|. As an example of this, consider translating lambda terms to \emph{cartesian closed category} combinators (the categorical version of the lambda calculus). This can be done if the lambda terms are given as |Bruijn| values, as demonstrated in Figure \ref{ccc}. Without the Key monad, there seem to be no way to do the same for terms constructed with the PHoas terms.
+The well-scopedness of variables in a |Bruijn| value follows from the fact that the value is well-typed. With |Phoas|, the well-scopedness relies on the meta-level (i.e. not formalized through types) argument that no well-scoped values can be created by using the |Phoas| interface. The internal (i.e. formalized through types) well-scopedness of |Bruijn|, allows interpretations of syntax which seem to not be possible if we are using terms constructed with |Phoas|. As an example of this, consider translating lambda terms to \emph{cartesian closed category} combinators (the categorical version of the lambda calculus). This can be done if the lambda terms are given as |Bruijn| values, as demonstrated in Figure \ref{ccc}. Without the Key monad, there seem to be no way to do the same for terms constructed with the Phoas terms.
 
-Our implementation of |phoasToBruijn| works by first translating |PHoas| to the |KExp| from the previous subsection, and then translating that to typed de bruijn indices. The first step in this translation is straightforwardly defined using the |Hoas| interface from the previous subsection: 
+Our implementation of |phoasToBruijn| works by first translating |Phoas| to the |KExp| from the previous subsection, and then translating that to typed de bruijn indices. The first step in this translation is straightforwardly defined using the |Hoas| interface from the previous subsection: 
 \begin{code}
 phoasToKey :: (forall v. Phoas v a) -> (forall s. KeyM s (KExp s a))
 phoasToKey v = getExp (go v) where
@@ -678,7 +678,7 @@ Is the |Key| monad is expressible in Haskell directly, without using |unsafeCoer
 
 \subsection{Implementation using |unsafeCoerce|}
 
-To get a feel for possible implementations of the |Key| monad, let us first consider a straightforward implementation using |unsafeCoerce| in which we give each key a unique name. One could implement generating unique names using a state monad, but the |(purity)| key monad law (|m >> n == n)| would then not hold. Instead, we implement the |Key| monad using an splittable name supply, with the following interface:
+To get a feel for possible implementations of the |Key| monad, let us first consider a straightforward implementation, using |unsafeCoerce|, in which we give each key a unique name. One could implement generating unique names using a state monad, but the |(purity)| key monad law (|m >> n == n)| would then not hold. Instead, we implement the |Key| monad using an splittable name supply, with the following interface:
 \begin{code}
 newNameSupply  :: NameSupply
 split          ::  NameSupply -> 
@@ -733,7 +733,7 @@ The informal argument why the use of |unsafeCoerce| in |testEquality| is safe is
 
 \subsection{The key indexed monad}
 
-Can we encode the formalize that when to keys are the same value their types must also be the same through types? It turns out we can, but this adds more types to the interface, leading to a loss of power of the construction.
+Can we formalize through types the invariant that when to keys are the same value their types must also be the same? It turns out we can, but this adds more types to the interface, leading to a loss of power of the construction.
 
 The crucial insight is that is needed for this implemenation, is that it \emph{is} possible to implement to compare two indices in a heterogenous list (Fig \ref{heteros}), and if they are equal, then produce a proof types are equal, as follows:
 \begin{code}
@@ -767,14 +767,14 @@ samePath ::  TTreePath p w -> TTreePath p' w
 The implementation of this function is a bit more involved than for |Index|, but is unsuprising:
 \begin{code}
 samePath Start      Start      = Just Refl
-samePath (Left l)   (Left r)   = weakenL  <$> samePath l r
-samePath (Right l)  (Right r)  = weakenR  <$> samePath l r
+samePath (Left l)   (Left r)   = weakL  <$> samePath l r
+samePath (Right l)  (Right r)  = weakR  <$> samePath l r
 samePath _          _          = Nothing where 
-  weakenL :: ((l :++: r) :~: (l' :++: r')) -> l :~: l'
-  weakenL x = case x of Refl -> Refl
+  weakL :: ((l :++: r) :~: (l' :++: r')) -> l :~: l'
+  weakL x = case x of Refl -> Refl
 
-  weakenR :: ((l :++: r) :~: (l' :++: r')) -> r :~: r'
-  weakenR x = case x of Refl -> Refl
+  weakR :: ((l :++: r) :~: (l' :++: r')) -> r :~: r'
+  weakR x = case x of Refl -> Refl
 \end{code}
 We can use this function to implement a function that produces a proof that if to paths to a leaf are the same, then their associated types are the same:
 \begin{code}
@@ -811,6 +811,7 @@ runKeyIm      :: (forall s. KeyIm s l a) -> a
 
 testEquality  ::  Key s a -> Key s b -> Maybe (a :~: b)
 \end{code}
+The implementation of this interface is completely analogous to the implementation of the key monad in the previous subsection. The only difference is that |testEquality| now uses |sameName|, ommitting the need for |unsafeCoerce|.
 This interface is an instance of the \emph{parametric effect monad} type class\cite{peff}. 
 
 Note that in the implementation |runKeyIm| now uses the universally quantified type variable to |s| to unifiy |s| with |l|. This ``closes the context'', stating that the context is precisely the types which are created in the computation. In contrast, in |runKeyM| the type variable was not given an interpretation.
@@ -819,7 +820,7 @@ While we have succeeded in avoiding |unsafeCoerce|, this construction is \emph{l
 
 \subsection{Attempting to recover the |Key| monad}
 
-Can we formalize the invariant and keep the interface the same? An obvious attempt at this is hiding the extra type of |KeyIm|:
+Can we formalize the invariant through types and provide the regular |Key| monad interface? An obvious attempt at this is hiding the extra type of |KeyIm|:
 \begin{code}
 data KeyM s a where
   KeyM :: KeyIm s p a -> KeyM s a
@@ -836,11 +837,11 @@ runKeyM :: (exists p. forall s. KeyIm s p a) -> a
 \end{code}
 These types are \emph{not} equivalent: the latter implies the former, but not the other way around. In the former, the type which is bound to |p| may depend on |s|, which cannot happen in the latter. 
 
- If the types of all keys which are created do not mention |s|, we do not for example create a key of type |Key s (Key s a)|, then one could argue that coercing the computation from the former to the latter is perfectly safe. However, if we create a key of type |Key s (Key s Int)|, then when the type |s| is unified with the tree of types of the keys, this gives rise to a \emph{cyclic} type:
+ If the types of all keys which are created do not mention |s|, we do not for example create a key of type |Key s (Key s a)|, then one could argue that coercing the computation from the former to the latter is perfectly safe. However, if we create a key of type |Key s (Key s Int)|, then when the type |s| is unified with the tree of types of the keys, this gives rise to \emph{cyclic} types. For example:
 \begin{code}
 s ~ (Key s Int) :++: t
 \end{code} 
-Allowing such keys, where the type of the key mentions |s|, allows us to write |fix| without recursion, as demonstrated in the next section. Apart from that, is seem that this particular cyclic type does not do any harm (we already had nontermination in Haskell), and it is likely to be safe to coerce the first type of |runKeyM| to the latter. However, it is highly unlikely that we can formulalize this through types that this coercion is safe: the Haskell type system does not allow cyclic types. Even if it did, it is unclear to us how to prove that this coercion is safe.
+In the next section, we demonstrate that allowing such keys, where the type of the key mentions |s|, allows us to write |fix| without recursion. Apart from that, it seems that these particular cyclic type does not do any harm (we already had nontermination in Haskell), and it is likely to be safe to coerce the first type of |runKeyM| to the latter. However, it is highly unlikely that we can formulalize this through types that this coercion is safe: the Haskell type system does not allow cyclic types. Even if it did, it is unclear to us how to prove that this coercion is safe.
 
 For |join| other problems arise. We need a implementation of type:
 \begin{code}
@@ -855,9 +856,9 @@ However, to use the implementation of |join| of |KeyIm|, we need the argument to
 \begin{code}
 exists p q. TNameSupply p s ->  TNameSupply q s -> a
 \end{code}
-Again, these two types are \emph{not} equivalent: the latter implies the former, but not the other way around. In this situation we know more about the possible argument values than the types suggest. We know that |Key| is an abstract type for the user, who only has access to |testEquality|, not the constructors of |Key|. Hence the user-supplied argument function cannot distinguish between different value of the type |TNameSupply p s|. For example, the values |Left Start| and |Left (Left Start)| are indistinguisable for the argument function: they are only used to create unique names, and compare them, not to observe their exact value. 
+Again, these two types are \emph{not} equivalent: the latter implies the former, but not the other way around. In this situation we know more about the possible argument values than the types suggest. We know that |Key| is an abstract type for the user, who only has access to |testEquality|, not the constructors of |Key|. Hence the \emph{user-supplied} argument function cannot distinguish between different values of the type |TNameSupply p s|. For example, the values |Left Start| and |Left (Left Start)| are indistinguisable for the argument function: they are only used to create unique names, and compare them, not to observe their exact value. 
 
-For this reason, the type that is bound to |q| is the same type for all values of |TNameSupply p s|. Hence, it should be safe to coerce the argument from the former type to the later type. However, formalizing this through types seems unlikely. One could try formalizing the abstractness of the namesupply by making the implementation polymorphic in the implementation of the namesupply and names. However, as far as we know it is already impossible to prove the following simpler property (which holds by parametricity) in Haskell: |(forall f. f x -> exists q. g q) -> (forall f. exists q. f x -> g q)|. Morever, when a computation creates an infinite number of keys, this will also lead to an \emph{infinite} type which is not allowed in the Haskell type system. For these reasons, we feel that it is highly unlikely that the |Key| monad can be expressed in pure Haskell.
+For this reason, the type that is bound to |q| is \emph{the same type} for all values of |TNameSupply p s|. Hence, it should be safe to coerce the argument from the former type to the later type. However, formalizing this through types seems unlikely. One could try formalizing the abstractness of the namesupply by making the implementation polymorphic in the implementation of the namesupply and names. One would then also need to formalize the exact behavior of the namesupply, for example that the namesupply acts in exactly the same way as the implementation with paths in trees. This property, cannot be encoded in the Haskell type system (yet), since it requires the types to constraint the exact behavior of functions in the implementation, which requires dependent typing.  Moreover, as far as we know it is already impossible to prove the following simpler property (which holds by parametricity) in Haskell: |(forall f. f x -> exists q. g q) -> (forall f. exists q. f x -> g q)|. Finally, when a computation creates an infinite number of keys, this will also lead to an \emph{infinite} type, which is not allowed in the Haskell type system. For these reasons, we feel that it is highly unlikely that the |Key| monad can be expressed in pure Haskell.
 
 \section{Safety of the |Key| monad}
 \atze{There is some overlap with the previous section.}
