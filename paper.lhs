@@ -515,11 +515,11 @@ class Hoas f where
 newtype HoasKey s a = 
   HK { getExp :: KeyM s (KExp s a) }
 
-instance Hoas (HoasExp s) where
+instance Hoas (HoasKey s) where
   lam f    = HK $ do  k <- newKey 
-                      b <- getExp (f (He (Var k)))
-                      return (Lam k b)
-  app f x  = HK $ App <$> getExp f <*> getExp x
+                      b <- getExp $ f $ HK $ pure $ KVar k
+                      return (KLam k b)
+  app f x  = HK $ KApp <$> getExp f <*> getExp x 
 \end{code}
 For instance, the lambda term |(\x y -> x)| can now be constructed with: |lam (\x -> lam (\y -> x))|
 
@@ -532,7 +532,7 @@ In Parametric HOAS, typed lambda terms are represented by the following data typ
 data Phoas v a where
   PVar  :: v a -> Phoas v a
   PLam  :: (v a -> Phoas v b) -> Phoas v (a -> b)
-  PApp  :: Phoas v (a -> b) -> Phoas v a -> Phoas b
+  PApp  :: Phoas v (a -> b) -> Phoas v a -> Phoas v b
 \end{code}
 The reading of the type parameter |v| is the type of \emph{variables}.
 For example, the lambda term |(\x y -> x)| can be constructed as follows:
@@ -583,12 +583,12 @@ The well-scopedness of variables in a |Bruijn| value follows from the fact that 
 
 Our implementation of |phoasToBruijn| works by first translating |PHoas| to the |KExp| from the previous subsection, and then translating that to typed de bruijn indices. The first step in this translation is straightforwardly defined using the |Hoas| interface from the previous subsection: 
 \begin{code}
-phoasToKey :: (forall v. PHoas v a) -> (forall s. KeyM s (KeyLam s a))
+phoasToKey :: (forall v. Phoas v a) -> (forall s. KeyM s (KExp s a))
 phoasToKey v = getExp (go v) where
-  go :: PHoas (HoasKey s) a -> HoasKey s a
-  go (PVar v) = v
-  go (PLam f) = lam (go . f)
-  go (PApp f x) = app (go f) (go x)
+  go :: Phoas (HoasKey s) a -> HoasKey s a
+  go (PVar v)    = v
+  go (PLam f)    = lam (go . f)
+  go (PApp f x)  = app (go f) (go x)
 \end{code}
 
 We will now show how we can create a function of type:
@@ -597,7 +597,7 @@ keyToBruijn :: KExp s a -> Bruijn [] a
 \end{code}
 Using this function, we can then implement |phoasToBruijn| as follows:
 \begin{code}
-phoasToBruijn :: (forall v. PHoas v x) -> Bruijn [] x
+phoasToBruijn :: (forall v. Phoas v x) -> Bruijn [] x
 phoasToBruijn p = 
   runKeyM (keyToBruijn <$> phoasToKey p)
 \end{code}
@@ -606,7 +606,7 @@ To implement the |keyToBruijn| function, we need a variant of the |Box| we saw p
 data FBox s f where
   FLock :: Key s a -> f a -> FBox s f
 
-funlock :: Key s -> FBox s f -> Maybe (f a)
+funlock :: Key s a -> FBox s f -> Maybe (f a)
 funlock k (FLock k' x) =
   case testEquality k k' of
     Just Refl  -> Just x
@@ -638,9 +638,9 @@ With this machinery in place, we can translate |KExp| to |Bruijn| as follows:
 keyToBruijn :: KExp s a -> Bruijn [] a
 keyToBruijn = go empty where
   go :: FKeyMap s (Index l) -> KExp s x -> Bruijn l x
-  go e (KVar v)    = NVar (e ! v)
-  go e (KLam k b)  = NLam (go (extend k e) b)
-  go e (KApp f x)  = NApp (go e f) (go e x)
+  go e (KVar v)    = BVar (e ! v)
+  go e (KLam k b)  = BLam (go (extend k e) b)
+  go e (KApp f x)  = BApp (go e f) (go e x)
 \end{code}
 
 Note that |keyToBruijn| fails if the input |KExp| is ill-scoped. This will never happen when |keyToBruijn| is called from |phoasToBruijn| because |phoasToKey| will always give well-scoped values of type |KExp|. This relies on the meta-level argument that values of type |PHoas| are always well-scoped. We stress that hence the key monad extension \emph{cannot} serve as a replacement of well-scopedness axiom used in a dependently typed setting. 

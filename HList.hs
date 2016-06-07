@@ -3,9 +3,7 @@
 module HList where
 
 import Data.Type.Equality
-
-class PFunctor p where
- pfmap :: (forall x. f x -> g x) -> p f -> p g
+import PFunctor
 
 data HList l where
   Nil   :: HList '[]
@@ -33,21 +31,3 @@ index :: TList l f -> Index l a -> f a
 index (h ::: _) Head     = h
 index (_ ::: t) (Tail i) = index t i
 
-instance PFunctor (TList l) where
-  pfmap f TNil      = TNil
-  pfmap f (h ::: t) = f h ::: pfmap f t
-
-{-
-hhead :: HFList f (h ': t) -> f h
-hhead (FHCons h _) = h
--}
-
-
-{-
-toHIndex :: Nat n -> HList l -> HIndex l (Index l n)
-toHIndex SZ (HCons h _) = HHead
-toHIndex (SS i) (HCons _ t) = HTail (toHIndex i t)
-
-toIndex :: WellFormed l x -> HList l -> HIndex l x
-toIndex (WellFormed i) = toHIndex i l
--}

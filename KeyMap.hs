@@ -1,11 +1,20 @@
-
-module KeyMap(KeyMap, singleton, empty, insert,lookup, (!)) where
+{-# LANGUAGE GADTs #-}
+module KeyMap(Box(..), unlock, KeyMap, singleton, empty, insert,lookup, (!)) where
 
 import KeyM
 import Control.Monad
-import Box
 import Prelude hiding (lookup,(!))
 import Data.Maybe
+
+data Box s where
+  Lock :: Key s a -> a -> Box s
+
+unlock :: Key s a -> Box s -> Maybe a
+unlock k (Lock k' x) =
+   case testEquality k k' of
+    Just Refl  -> Just x
+    Nothing    -> Nothing
+
 
 newtype KeyMap s = Km [Box s]
 

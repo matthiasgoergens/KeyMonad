@@ -1,60 +1,58 @@
 {-# LANGUAGE GADTs, RankNTypes, TypeFamilies,DataKinds, KindSignatures,TypeOperators, NoMonomorphismRestriction #-}
 module SyntaxTranslate where
 
-import HList
 import KeyM
-import HFMap
-import Prelude hiding (lookup, id, (.), fst,snd, curry, uncurry)
-import Control.Category
-import Unsafe.Coerce
+import FKeyMap
+import KExp
+import HList
+import PFunctor
 import Control.Applicative hiding (empty)
+import Prelude hiding (lookup, id,  fst,snd, curry, uncurry)
 
+data Phoas v a where
+  PVar  :: v a -> Phoas v a
+  PLam  :: (v a -> Phoas v b) -> Phoas v (a -> b)
+  PApp  :: Phoas v (a -> b) -> Phoas v a -> Phoas v b
 
-class Hoas f where
-    lam :: (f a -> f b) -> f (a -> b)
-    app :: f (a -> b) -> f a -> f b
-
-data PHoas f a where
-    PVar :: f a -> PHoas f a
-    PLam :: (f a -> PHoas f b) -> PHoas f (a -> b)
-    PApp :: PHoas f (a -> b) -> PHoas f a -> PHoas f b
-
-instance Hoas (PHoas f) where
+instance Hoas (Phoas f) where
     lam f = PLam (f . PVar)
     app = PApp
 
-type ClosedPHoas a = forall f. PHoas f a
+type ClosedPHoas a = forall f. Phoas f a
+
+data Bruijn l a where
+  BVar  :: Index l a -> Bruijn l a
+  BLam  :: Bruijn (a ': l) b -> Bruijn l (a -> b)
+  BApp  :: Bruijn l (a -> b) -> Bruijn l a -> Bruijn l b
 
 
 
-data NSyn l a where
-  NVar :: Index l a -> NSyn l a
-  NLam :: NSyn (a ': l) b -> NSyn l (a -> b)
-  NApp :: NSyn l (a -> b) -> NSyn l a -> NSyn l b
 
-type ClosedNHoas a = NSyn '[] a
-
-
-data KeyLam s a where
-  KVar :: Key s a -> KeyLam s a
-  KLam :: Key s a -> KeyLam s b -> KeyLam s (a -> b)
-  KApp :: KeyLam s (a -> b) -> KeyLam s a -> KeyLam s b
-
-newtype HoasKey s a = HK { getExp :: KeyM s (KeyLam s a) }
-
-instance Hoas (HoasKey s) where
-  lam f = HK $
-     do k <- newKey
-        b <- getExp (f (HK (pure $ KVar k)))
-        return $ KLam k b
-  app f x = HK $ KApp <$> getExp f <*> getExp x
-
-phoasToKey :: (forall v. PHoas v a) -> (forall s. KeyM s (KeyLam s a))
+phoasToKey :: (forall v. Phoas v a) -> (forall s. KeyM s (KExp s a))
 phoasToKey v = getExp (go v) where
-  go :: PHoas (HoasKey s) a -> HoasKey s a
-  go (PVar v) = v
-  go (PLam f) = lam (go . f)
-  go (PApp f x) = app (go f) (go x)
+  go :: Phoas (HoasKey s) a -> HoasKey s a
+  go (PVar v)    = v
+  go (PLam f)    = lam (go . f)
+  go (PApp f x)  = app (go f) (go x)
+
+phoasToBruijn :: (forall v. Phoas v x) -> Bruijn '[] x
+phoasToBruijn p = 
+   runKeyM (keyToBruijn <$> phoasToKey p)
+
+extend :: Key s h -> FKeyMap s (Index t) ->
+            FKeyMap s (Index (h ': t))
+extend k m = insert k Head (pfmap Tail m)
+
+
+keyToBruijn :: KExp s a -> Bruijn '[] a
+keyToBruijn = go empty where
+  go :: FKeyMap s (Index l) -> KExp s x -> Bruijn l x
+  go e (KVar v)    = BVar (e ! v)
+  go e (KLam k b)  = BLam (go (extend k e) b)
+  go e (KApp f x)  = BApp (go e f) (go e x)
+
+
+{-
 
 makeMorePrecise :: (forall s. KeyM s (KeyLam s x)) -> NSyn '[] x
 makeMorePrecise  m = runKeyM (toNSyn <$> m)
@@ -71,7 +69,7 @@ translate :: HFMap s (Index l) -> KeyLam s a -> NSyn l a
 translate e (KVar v)   = NVar (e ! v)
 translate e (KLam k b) = NLam (translate (extend k e) b)
 translate e (KApp f x) = NApp (translate e f) (translate e x)
-
+-}
 
 {-
 toNominal :: Hoas h => PHoas h a -> KeyM s (Nominal s a)
