@@ -1,28 +1,50 @@
 {-# LANGUAGE Rank2Types,GeneralizedNewtypeDeriving #-}
+module KeyM(module Data.Type.Equality, KeyM, Key, newKey, runKeyM) where
 
-
-module KeyM(module Data.Type.Equality, KeyM, Key, newKey, hashKey, runKeyM) where
-
-import Control.Monad.State
-import Control.Monad.Fix
-import Control.Applicative
 import Unsafe.Coerce
 import Data.Type.Equality
+import Control.Applicative
+import Control.Monad
 
-newtype KeyM  s a = KeyM (State Integer a) deriving (MonadFix, Monad,Applicative, Functor)
-newtype Key   s a = Key Integer
+data TreePath = Start | Leftc TreePath | Rightc TreePath deriving (Eq)
 
+type Name = TreePath
+type NameSupply = TreePath
 
-newKey :: KeyM s (Key s a)
-newKey = KeyM $ do i <- get ; put (i + 1) ; return (Key i)
+newNameSupply :: NameSupply
+newNameSupply = Start
 
-hashKey :: Key s a -> Int
-hashKey (Key k) = fromIntegral k
+split :: NameSupply -> (NameSupply, NameSupply)
+split s = (Leftc s, Rightc s)
 
-instance TestEquality (Key l) where
+supplyName :: NameSupply -> Name
+supplyName = id
+
+instance TestEquality (Key s) where
   testEquality (Key i) (Key j)
     | i == j     = Just (unsafeCoerce Refl)
     | otherwise  = Nothing
 
-runKeyM :: (forall s . KeyM s a) -> a
-runKeyM (KeyM m) = fst $ runState m 0
+
+data KeyM s a = KeyM { getKeyM :: NameSupply -> a } 
+data Key s a = Key Name
+
+
+newKey :: KeyM s (Key s a)
+newKey = KeyM $ \s -> Key (supplyName s)
+
+instance Functor (KeyM s) where
+  fmap = liftM
+
+instance Applicative (KeyM s) where
+  pure = return
+  (<*>) = ap
+
+instance Monad (KeyM s) where
+  return x = KeyM $ \_ -> x
+  m >>= f = KeyM $ \s ->
+     let (sl,sr) = split s
+     in getKeyM (f (getKeyM m sl)) sr
+
+runKeyM :: (forall s. KeyM s a) -> a
+runKeyM (KeyM f) = f newNameSupply

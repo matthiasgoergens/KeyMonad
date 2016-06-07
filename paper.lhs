@@ -135,12 +135,13 @@ empty :: KeyMap s
 empty = Km []
 
 insert :: Key s a -> a -> KeyMap s -> KeyMap s
-insert k v (Km l) = Lock k v : l
+insert k v (Km l) = Km (Lock k v : l)	
 
 lookup :: Key s a -> KeyMap s -> Maybe a
 lookup k (Km [])       = Nothing
 lookup k (Km (h : t))  = 
-  maybe (lookup k (Km t)) (unlock k)
+  unlock k h `mplus` lookup k (Km t)
+
 \end{code}
 
 \subsection{Implementing the |ST| monad}
@@ -158,20 +159,26 @@ newtype ST s a =
 It is now straightforward to implement the operations for |STRef|s:
 \begin{code}
 newSTRef :: a -> ST s (STRef s a)
-newSTRef v = do  k <- lift newKey
-                 modify (insert k v)
-                 return k
+newSTRef v = ST $ 
+  do  k <- lift newKey
+      modify (insert k v)
+      return k
 
 readSTRef :: STRef s a -> ST s a
-readSTRef r = (fromJust . lookup r) `fmap` get
+readSTRef r = ST $ (! r) `fmap` get
 
 writeSTRef :: STRef s a -> a -> ST s ()
-writeSTRef k v = modify (insert k v)
+writeSTRef k v = ST $ modify (insert k v)
+
+
 \end{code}
 Finally, the implementation of |runST| simply runs the monadic computation contained in the |ST| type:
 \begin{code}
 runST :: (forall s. ST s a) -> a
-runST (Km m) = runKeyM (evalStateT empty m)
+runST m = runKeyM (evalStateT (unpack m) empty)
+
+unpack :: (forall s. ST s a) -> (forall s. StateT (KeyMap s) (KeyM s) a)
+unpack (ST m) = m
 \end{code}
 
 \subsection{Difference with the ST monad}
@@ -285,6 +292,8 @@ class Arrow a where
 
 In this section, we show that the |Key| monad gives us the power to implement an \emph{embedded} form of \emph{arrow syntax}. Without the |Key| monad, such syntax is, as far as we know, only possible by using specialized compiler support.
 
+\subsection{Arrows vs Monads}
+
 The |Arrow| type class, recalled in Figure \ref{arrowsdef}, was introduced by Hughes\cite{arrows} as an interface that is like monads, but which allows for more static information about the constructed computations to be extracted. However, in contrast to monads, arrows do not directly allow intermediate values to be \emph{named}, instead expressions must be written in \emph{point-free style}. 
 
 As an example, an arrow computation which feeds the same input to two arrows, and adds their outputs, can be expressed in point free style as follows:
@@ -337,6 +346,8 @@ Allowing this kind of behavior would make it impossible to translate arrow notat
 \end{code}
 Where |ArrowSyn| is the monad which we use to define our embedded arrow notation. The input and output of the arrow computations are enclosed in |Cage|s, a type which does not allow observation of the value of the type |x| it ``contains''. 
 
+\subsection{Implementing embedded arrow syntax}
+
 The implementation of a |Cage| is as follows:
 \begin{code}
 newtype Cage s x = Cage { liberate :: KeyMap s -> x }
@@ -356,8 +367,8 @@ proc ::  Arrow a =>
 Internally, the |ArrowSyn| monad builds an arrow from environment to environment, and creates names for values in these environments using |KeyM|.
 \begin{code}
 newtype ArrowSyn a s x =
-    AS (WriterT (EndoA a (KeyMap s)) (KeyMap s) x)
-       deriving Monad
+    AS (WriterT (EndoA a (KeyMap s)) (KeyM s) x)
+       deriving (Functor,Applicative,Monad)
 \end{code}
 Where |EndoA a x| is an arrow from a type |x| to the same type:
 \begin{code}
@@ -388,7 +399,7 @@ introEnv k = arr (singleton k)
 \end{code}
 We also define an arrow to eliminate an environment, by interpreting an expression (|Cage|) using that environment:
 \begin{code}
-elimEnv ::  Cage s x -> a (KeyMap s) x
+elimEnv :: Arrow a => Cage s x -> a (KeyMap s) x
 elimEnv c = arr (liberate c)
 \end{code}
 Next to introducing and eliminating environments, we also need to extend an environment and evaluate an expression while keeping the environment:
@@ -420,8 +431,8 @@ The |-<| operation get the arrow and the input expression as an argument, create
         (Cage s x -> ArrowSyn a s (Cage s y))
 a -< inC = AS $
    do  outK <- lift newKey
-       tell (EndoA $ toEnvA inC a outK)
-       return (lookupVar outK)
+       tell (EndoA $ toEnvA inC outK a)
+       return (toCage outK)
 \end{code}
 
 In the other direction, to implement |proc| we need to convert an arrow from environment to environment back to an arrow of type |x| to type |y|, for which we instead need the name of the input and an expression for the output:
@@ -441,10 +452,12 @@ proc ::  Arrow a =>
              a x y
 proc f = runKeyM $
       do  inK <- newKey
-          let AS m = f (lookupVar inK)
+          let AS m = f (toCage inK)
           (outC, EndoA a) <- runWriterT m
-          return (fromEnvA inK a outC)
+          return (fromEnvA inK outC a)
 \end{code} 
+
+\subsection{Discussion}
 
 Because all the operations in the |ArrowSyn| return a |Cage|, it not possible to observe the output of an arrow computation to decide what to do next. While we cannot decide what to do next based on the output of a computation of type |ArrowSyn s (Cage s x)|, we can, for example, decide what to next based on the outcome of a computation of type |ArrowSyn s Int|. This does not give our embedded arrow notation more power than regular arrow notation: the value of the integer cannot depend on the result of an arrow computation and hence must be the result of a pure computation. This essentially the same trick as described in Svenningsson and Svensson\cite{bjorn}.
 
@@ -460,15 +473,9 @@ data ArrowRm a s x = ArrowRm
          (ArrowSyn a s (Cage s x))
 instance RelMonad (ArrowRm a s) (Cage s) where ...
 \end{code}
-Altenkrich\cite{relmonad} shows that in category theory arrows are a special case of relative monads, but his construction is not a relative monad in Haskell. In particular his definition of bind does not allow us freely use bound values, instead it requires us to manually lift values into scope, in the same fashion as directly using de Bruijn indices. Our construction suggests that arrows are also a special case of relative monad in Haskell with the key monad, but a formal proof is outside the scope of this paper. In the code online, we also show that this construction can be extended to  \emph{relative monadfix} (with function : |rmfix :: v a -> m a|) to |ArrowLoop|, but the we cannot translate monadfix to |ArrowLoop|.
+Altenkrich et al.\cite{relmonad} show that in category theory arrows are a special case of relative monads, but his construction is not a relative monad in Haskell. In particular his definition of bind does not allow us freely use bound values, instead it requires us to manually lift values into scope, in the same fashion as directly using de Bruijn indices. Our construction suggests that arrows are also a special case of relative monad in Haskell with the key monad, but a formal proof is outside the scope of this paper. In the code online, we also show that this construction can be extended to  \emph{relative monadfix} (with function : |rmfix :: (v a -> m a) -> m a|) to |ArrowLoop|, but the we cannot translate monadfix to |ArrowLoop|.
 
 The \emph{Arrow Calculus}\cite{arrowcalc} describes a translation of a form of arrow syntax (not embedded in Haskell) to arrows which is very simillar to the construction presented here. Their calculus has five laws, three of which can be considered to be relative monad laws, which they use to prove the equational correspondance between their calculus and regular arrows. Due to the simillarity, their paper should provide a good starting point for anyone trying to prove the same for this construction.
-
-
-
-
-
- 
 
 \section{Representations of variables in Syntax}
 
