@@ -49,6 +49,12 @@
 \newcommand{\koen}[1]{{\it Koen says: #1}}
 \newcommand{\pablo}[1]{{\it Pablo says: #1}}
 
+
+\begin{abstract}
+\atze{This is a quick abstract I wrote for our abstract submission, needs work.}
+We present a small extension to Haskell called the Key monad. In the Key monad, unique keys of different types can be created and can be tested for equality. When two keys are equal, a proof is given that their types must also be equal. This gives us dynamic typing, but without the need for typeable constraints. We show that this extension allows us to do things we could not do without it, namely: implement the ST-monad, implement an embedded form of arrow notation in Haskell and translate parametric Hoas to typed de Bruijn indices. The Key monad is strongly related to the ST monad, but is simpler. Surprisingly, a full proof of the safety of the ST-monad remains elusive to this day. Hence, another reason for studying the Key monad is that a correctness proof for the Key monad could be much simpler than a correctness proof and such a proof would conceivably lead to a correctness proof of the ST-monad as well.
+\end{abstract}
+
 \section*{Alternative titles}
 
 The Key Monad: more general than the ST-monad, less constrained than dynamic types
@@ -841,7 +847,7 @@ Again, these two types are \emph{not} equivalent: the latter implies the former,
 For this reason, the type that is bound to |q| is the same type for all values of |TNameSupply p s|. Hence, it should be safe to coerce the argument from the former type to the later type. However, formalizing this through types seems unlikely. One could try formalizing the abstractness of the namesupply by making the implementation polymorphic in the implementation of the namesupply and names. However, as far as we know it is already impossible to prove the following simpler property (which holds by parametricity) in Haskell: |(forall f. f x -> exists q. g q) -> (forall f. exists q. f x -> g q)|. Morever, when a computation creates an infinite number of keys, this will also lead to an \emph{infinite} type which is not allowed in the Haskell type system. For these reasons, we feel that it is highly unlikely that the |Key| monad can be expressed in pure Haskell.
 
 \section{Safety of the |Key| monad}
-
+\atze{There is some overlap with the previous section.}
 \paragraph{Type safety}
 The first safety property that we conjecture the Key monad has is \emph{type safety}: |testEquality| will never allow us to proof |a :~: b| for two \emph{distinct} types. The informal agument is that each Key has one type associated with it, and a unique number, and hence if the numbers are the same the types must also be the same. The assumption that each Key has \emph{one} type associated with it is broken if we have  a (non-bottom) value of type |forall a. Key s a| for some specific |s|. This hypothetical value can be used to construct |unsafeCoerce :: a -> b| because it is a unique key for \emph{any} type. The argument why no non-bottom value of this type can be created by using the key monad is that we can only create new keys with |newKey| and the type |forall s. KeyM (forall a. Key s a)| does not unify with the type of |newKey|, namely |forall s a. KeyM (Key s a)|. For the same reason, it is also not possible to get polymorphic references, i.e. references of type |(forall a. IORef a)| in Haskell. Moreover, if the type of |runKeyM| is also crucial for type-safety. If its type was |KeyM s a -> a| instead of |(forall s. KeyM s a) -> a| we could create a polymorphic key with |runKeyM newKey :: forall a. Key s a|.
 
