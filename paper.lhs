@@ -57,8 +57,9 @@
   created and can be tested for equality. When two keys are equal, we
   can get a proof that their types must also be equal. This gives us
   dynamic typing, but without the need for Typeable constraints. We
-  show that this extension allows us to do things we could not do
-  without it, namely: to implement the ST monad, to implement an
+  show that this extension allows us to do things we could not
+  otherwise do
+  without unsafe features, namely: to implement the ST monad, to implement an
   embedded form of arrow notation in Haskell and to translate
   parametric HOAS to typed de Bruijn indices. Although strongly
   related to the ST monad, the Key monad is simpler and, arguably,
@@ -91,9 +92,10 @@ data a :~: b where Refl :: a :~: a
 \label{fig:key-monad}
 \end{figure}
 
-In this paper, we attempt to provide a new abstraction in Haskell that only provides feature (3) above: the combination of references (which we call {\em keys}) of different, unconstrainted types in the same computation. The result is a small library called {\em the Key Monad}. The API is given in Fig.\ \ref{fig:key-monad}.
+In this paper, we attempt to provide a new abstraction in Haskell that
+embodies only feature (3) above: the combination of references (which we call {\em keys}) of different, unconstrainted types in the same computation. The result is a small library called {\em the Key Monad}. The API is given in Fig.\ \ref{fig:key-monad}.
 
-The Key Monad |KeyM| is basically a crippled version of the |ST|-monad: we can monadically create keys of type |Key s a| using the function |newKey|, but we cannot read or write values to these keys; in fact, keys do not carry any value at all. We can convert a computation in |KeyM| into a pure value by means of |runKeyM|, which requires the computation to be polymorphic in |s|, just like |runST| would.
+The Key Monad |KeyM| is basically a crippled version of the |ST|-monad: we can monadically create keys of type |Key s a| using the function |newKey|, but we cannot read or write values to these keys; in fact, keys do not carry any values at all. We can convert a computation in |KeyM| into a pure value by means of |runKeyM|, which requires the computation to be polymorphic in |s|, just like |runST| would.
 
 The only new feature is the function |testEquality|, which compares two keys for equality. But the keys do not have to be of the same type! They just have to come from the same |KeyM| computation, indicated by the |s| argument. If two keys are not equal, the answer is |Nothing|. However, if two keys are found to be equal, {\em then their types should also be the same}, and the answer is |Just Refl|, where |Refl| is a constructor from the GADT |a :~: b| that functions as the ``proof'' that |a| and |b| are in fact the same type\footnote{It is actually possible to add |testEquality| to the standard interface of |STRef|s, which would provide much the same features in the ST monad as the Key Monad would, apart from some laziness issues. However, because of its simplicity, we think the Key Monad is interesting in its own right.}.
 
