@@ -96,7 +96,23 @@ So, there is a third reason for studying the Key Monad: A correctness proof for 
 
 This paper does not provide a formal correctness proof of the Key Monad. Instead, we will argue that the correctness of the Key Monad is just as plausible as the correctness of the ST-monad. We hope that the reader will not hold it against us that we do not provide a correctness proof. Instead, we would like this paper to double as a call to arms, to find (ideally, mechanized) proofs of correctness of both the Key Monad and the ST-monad!
 
+Our contributions are as follows:
+\begin{itemize}
+\item We present the Key monad (Section \ref{keym}).
+\item We show that added power of the Key monad allows us to do things we cannot do without it, namely:
+     \begin{itemize}
+          \item Implement the |ST|-monad (Section \ref{keym}).
+          \item Implement an \emph{embedded} form of arrow notation (Section \ref{arrow}).
+          \item Represent typed variables in typed representations of syntax (Section \ref{syntax}).
+          \item Translate parametric Hoas to nested de Bruijn indices, which allows interpretations of parametric Hoas terms, such translation to cartesian closed categories, which are not possible otherwise (Section \ref{syntax}).
+\end{itemize}
+\item We present an argument why the Key monad is not expressible in Haskell (without |unsafeCoerce|) (Section \ref{impl}).
+\item We argue that the safety of the Key monad is just as, if not more, likely than the safety of the |ST|-monad (Section \ref{safety}).
+\end{itemize}
+We discuss the state of the proof of the safety of the |ST|-monad in section \ref{stdis} and we conclude in Section \ref{conc}.
+
 \section{The Key Monad}
+\label{keym}
 
 \atze{This sections needs work}
 
@@ -268,7 +284,7 @@ This specialization does \emph{not} hold because, the left hand side type-checks
 
 
 \section{Embedding Arrow notation}
-
+\label{arrow}
 \begin{figure}
   \rule{\columnwidth}{0.4pt}
 \begin{code}
@@ -472,7 +488,7 @@ Altenkrich et al.\cite{relmonad} show that in category theory arrows are a speci
 The \emph{Arrow Calculus}\cite{arrowcalc} describes a translation of a form of arrow syntax (not embedded in Haskell) to arrows which is very simillar to the construction presented here. Their calculus has five laws, three of which can be considered to be relative monad laws, which they use to prove the equational correspondance between their calculus and regular arrows. Due to the simillarity, their paper should provide a good starting point for anyone trying to prove the same for this construction.
 
 \section{Representations of variables in Syntax}
-
+\label{syntax}
 What else can we do with the Key monad? The Key monad allows us to associate types with ``names'' (|Key|s), and to see that if two names are the same, then their associated types are also the same. Use cases for this especially pop up when dealing with representations of syntax with binders, as we will show next.
 
 \subsection{Typed names}
@@ -667,7 +683,7 @@ instance PFunctor (TList l) where
 \end{figure}
 
 \section{Implementing the Key monad}
-
+\label{impl}
 Is the |Key| monad is expressible in Haskell directly, without using |unsafeCoerce|? Can we employ more recent advancements such as \emph{GADT}s to ``prove'' to the type system that the |Key| monad is safe? In this section, we argue and motivate that the answer to this question is most likely ``no'' by exploring how far we can get. 
 
 \subsection{Implementation using |unsafeCoerce|}
@@ -855,6 +871,7 @@ Again, these two types are \emph{not} equivalent: the latter implies the former,
 For this reason, the type that is bound to |q| is \emph{the same type} for all values of |TNameSupply p s|. Hence, it should be safe to coerce the argument from the former type to the later type. However, formalizing this through types seems unlikely. One could try formalizing the abstractness of the namesupply by making the implementation polymorphic in the implementation of the namesupply and names. One would then also need to formalize the exact behavior of the namesupply, for example that the namesupply acts in exactly the same way as the implementation with paths in trees. This property, cannot be encoded in the Haskell type system (yet), since it requires the types to constraint the exact behavior of functions in the implementation, which requires dependent typing.  Moreover, as far as we know it is already impossible to prove the following simpler property (which holds by parametricity) in Haskell: |(forall f. f x -> exists q. g q) -> (forall f. exists q. f x -> g q)|. Finally, when a computation creates an infinite number of keys, this will also lead to an \emph{infinite} type, which is not allowed in the Haskell type system. For these reasons, we feel that it is highly unlikely that the |Key| monad can be expressed in pure Haskell.
 
 \section{Safety of the |Key| monad}
+\label{safety}
 \atze{There is some overlap with the previous section.}
 
 \atze{This sections needs work}
@@ -913,13 +930,13 @@ A tricky bit here is that since a |Key| computation might create an infinite num
 \paragraph{Termination}
 A fourth desirable property of a type system extension is preservation of termination. What this usually means is that type-safe programs that do not use recursion terminate. Haskell already breaks this property: even without term-level recursion, but allowing type-level recursion, we can create programs that do not terminate. But if we disallow covariant recursion on the type level (i.e.\ type-level recursive occurrences may not occur on the left of a function arrow), then all Haskell programs without term-level recursion do terminate.
 
-It turns out that adding the Key Monad actually breaks termination, even when we disallow covariant recursion on the type level and recursion at the term level. We show this by implementing a general fixpoint combinator without using covariant recursion at the type level.
+It turns out that adding the Key Monad actually breaks termination, even when we disallow covariant recursion on the type level and recursion at the term level. We show this by implementing a general fixpoint combinator, which uses neither covariant recursion at the type level nor term-level recursion.
 
 \begin{figure}
 \begin{code}
-data D s a
-  = Fun (Box s -> D s a)
-  | Val a
+data D s a 
+   =  Fun (Box s -> D s a)
+   |  Val a
 
 lam :: Key s (D s a) -> (D s a -> D s a) -> D s a
 lam k f = Fun (f . fromJust . unlock k)
@@ -928,20 +945,19 @@ app :: Key s (D s a) -> D s a -> D s a -> D s a
 app k (Fun f) x = f (Lock k x)
 
 fix :: (a -> a) -> a
-fix f = runKeyM
-  (do  k <- newKey
-       let f'   = lam k (Val . f . unVal)
-           xfxx = lam k (\x -> app k f' (app k x x))
-           fixf = app k xfxx xfxx
-       return (unVal fixf))
- where
-  unVal (Val x) = x
+fix f = runKeyM $
+   do  k <- newKey
+       let f'    = lam k (Val . f . unVal)
+           xfxx  = lam k (\x -> app k f' (app k x x))
+           fixf  = app k xfxx xfxx
+       return (unVal fixf)
+ where unVal (Val x) = x
 \end{code}
 \label{fig:fix}
 \caption{Implementing a general fixpoint combinator without term-level recursion nor type-level covariant recursion}
 \end{figure}
 
-In Fig.\ \ref{fig:fix} we show how this can be done. First, we introduce a datatype |D s a| for domains representing models of the untyped lambda calculus. (We are going to encode the standard fixpoint combinator |\f -> (\x -> f (x x)) (\x -> f (x x))| in this domain.) An element of |D s a| is either a function over |D s a| or a value of type |a|. Normally, we would use covariant recursion for the argument of |Fun|, but we are not allowed to, so we mask it by using a |Box s| instead. As a result, |D s a| is not covariantly recursive, and neither are any of its instances.
+In Fig.\ \ref{fig:fix} we show how this can be done. First, we introduce a datatype |D s a| for domains representing models of the untyped lambda calculus. (We are going to encode the standard fixpoint combinator |\f -> (\x -> f (x x)) (\x -> f (x x))| in this domain). An element of |D s a| is either a function over |D s a| or a value of type |a|. Normally, we would use covariant recursion for the argument of |Fun|, but we are not allowed to, so we mask it by using a |Box s| instead. As a result, |D s a| is not covariantly recursive, and neither are any of its instances.
 
 Second, we introduce two helper functions: |lam|, which takes a function over the domain, and injects it as an element into the domain, and |app|, which takes two elements of the domain and applies the first argument to the second argument. Both need an extra argument of type |Key s (D s a)| to lock/unlock the forbidden recursive argument.
 
@@ -950,7 +966,7 @@ Third, the fixpoint combinator takes a Haskell function |f|, wraps it onto the d
 What this shows is that (1) adding the Key Monad to a terminating language may make it non-terminating, (2) the Key Monad is a genuine extension of Haskell without term-level recursion and type-level covariant recursion. Incidentally, this is also the case for the ST-monad.
 
 \section{Discussion on the ST-monad}
-
+\label{stdis}
 The ST-monad was introduced in \cite{stmonad} and contained some correctness statements and also a high-level description of a proof. The proof sketch mentions the use of parametricity, which is a doubtful proof technique to use because it is not established that parametricity still holds for a language with the ST-monad. A follow-up paper \cite{LaunchburySabry} mentions another problem with the first paper, in particular that implementations of the lazy ST-monad may actually generate the wrong result in a setting that is more eager. This paper claims to fix those issues with a new semantics and proof sketch. However, a bug in this correctness proof was discovered, which lead to a series of papers formalizing the treatment of different versions of encapsulating strict and lazy state threads in a functional language, culminating in \cite{MoggiSabry}. This paper gives different formulations of strict and lazy state threads, one of them corresponding to lazy state threads in Haskell. The aim of the paper is to establish {\em type safety} of state threads. However, the paper only provides a proof sketch of type safety for one of the formulations, and only claims type safety (without a proof) for the other ones.
 
 Even if type safety may now be considered to have been established by these papers, we are still left with referential transparency and abstraction safety. Referential transparency is quite tricky for actual implementations of the ST-monad since efficient implementations use global pointers. Abstraction safety is also very important because most people assume that parametricity in Haskell actually holds, without giving it a second thought that the ST-monad may destroy it.
@@ -959,6 +975,9 @@ Now, we actually believe that the ST-monad (and also the Key Monad) is correct i
 
 \section{Conclusion}
 
+\atze{Here should be some repetition.}
+
+\label{conc}
 \bibliographystyle{apalike}
 \bibliography{refs}
 
