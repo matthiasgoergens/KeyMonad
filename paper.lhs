@@ -51,8 +51,22 @@
 
 
 \begin{abstract}
-\atze{This is a quick abstract I wrote for our abstract submission, needs work.}
-We present a small extension to Haskell called the Key monad. In the Key monad, unique keys of different types can be created and can be tested for equality. When two keys are equal, a proof is given that their types must also be equal. This gives us dynamic typing, but without the need for typeable constraints. We show that this extension allows us to do things we could not do without it, namely: implement the ST monad, implement an embedded form of arrow notation in Haskell and translate parametric Hoas to typed de Bruijn indices. The Key monad is strongly related to the ST monad, but is simpler. Surprisingly, a full proof of the safety of the ST monad remains elusive to this day. Hence, another reason for studying the Key monad is that a correctness proof for the Key monad could be much simpler than a correctness proof and such a proof would conceivably lead to a correctness proof of the ST monad as well.
+  \atze{This is a quick abstract I wrote for our abstract submission,
+    needs work.}  We present a small extension to Haskell called the
+  Key monad. In the Key monad, unique keys of different types can be
+  created and can be tested for equality. When two keys are equal, we
+  can get a proof that their types must also be equal. This gives us
+  dynamic typing, but without the need for Typeable constraints. We
+  show that this extension allows us to do things we could not do
+  without it, namely: to implement the ST monad, to implement an
+  embedded form of arrow notation in Haskell and to translate
+  parametric HOAS to typed de Bruijn indices. Although strongly
+  related to the ST monad, the Key monad is simpler and, arguably,
+  easier to prove correct. Surprisingly, a full proof of the safety of
+  the ST monad remains elusive to this day. Hence, another reason for
+  studying the Key monad is that a correctness proof for it might
+  conceivably be a stepping stone towards a correctness proof
+  of the ST monad as well.
 \end{abstract}
 
 
