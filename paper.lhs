@@ -779,13 +779,13 @@ However, more efficient implementations of |Key| monad as well as the |ST| monad
 
 
 \subsection{Abstraction safety} 
-Abstraction safety is the property that we cannot break the abstraction barriers which are introduced through existential types. For example, if we have an existential type:
+Abstraction safety is the property that we cannot break the abstraction barriers which are introduced through existential types. For example, consider the following existential type:
 \begin{code}
 data AbsBool where
   AbsBool ::  Eq a => a -> a -> (a -> b -> b -> b) 
               -> AbsBool
 \end{code}
-Which use in two ways:
+Let us consider two different uses of this type:
 \begin{code}
 boolBool = 
   AbsBool True False (\c t f -> if c then t else f) 
@@ -797,7 +797,7 @@ If our language is abstraction safe, then it is impossible to observe any differ
 badTest :: a -> b -> Maybe (a :~: b)
 \end{code}
 
-The primitive |testEquality| is similar to the |badTest| primitive above, and indeed our operations on |Box| do allow us to ``break the abstraction barrier'': if |unlock| succeeds, we have learned which type is hidden in the |Box|. However, finding out which type is hidden by an existential type is can not only be done with the Key monad, but also by the established Generalized Algebraic Data types extension of Haskell. For example, suppose we have the following type:
+The primitive |testEquality| is similar to the |badTest| primitive above, and indeed our operations on |Box| do allow us to ``break the abstraction barrier'': if |unlock| succeeds, we have learned which type is hidden in the |Box|. However, finding out which type is hidden by an existential type can not only be done with the Key monad, but also by the established Generalized Algebraic Data types extension of Haskell. For example, suppose we have the following type:
 \begin{code}
 data IsType a where
   IsBool  :: IsType Bool
@@ -813,20 +813,26 @@ testEquality IsChar  IsChar  = Just Refl
 testEquality _       _       = Nothing
 \end{code}
 
-There are however formulations of parametricity which state more precisely exactly which abstraction barrier cannot be crossed \cite{type-safecast, bernardy_proofs_2012}, which still state that |boolBool| and |boolInt| are indistinguishable. We can think of |runKeyM| as an operation which dreams up a specific |Key| GADT for the given computation, for example:
+There are, however, formulations of parametricity which state more precisely exactly which abstraction barrier cannot be crossed \cite{type-safecast, bernardy_proofs_2012}. In these formulations, |boolBool| and |boolInt| are indistinguishable. We can think of |runKeyM| as an operation which dreams up a specific |Key| GADT for the given computation, for example:
 \begin{code}
 data Key A a where
   Key0 :: Key A Int
   Key1 :: Key A Bool
   ...
 \end{code}
-Where |A| is a globally unique type associated wit the computation. A tricky bit here is that since a |Key| computation might create an infinite number of keys, this hypothetical datatype might have an infinite number of constructors. Alternatively, we can interpret keys as GADTs that indexes in a type-level list or type-level tree, as we do in Section \ref{impl}.  We conjecture that there is a variant of parametricity for Haskell extended with the Key monad in which, like with GADTs, states that |boolBool| and |boolInt| above are indistinguishable. 
+Here |A| is a globally unique type associated with the computation. This interpretation is a little tricky: since a |Key| computation might create an infinite number of keys, this hypothetical datatype might have an infinite number of constructors. Alternatively, we can interpret keys as GADTs that index into a type-level list or type-level tree, as we do in Section \ref{impl}.  We conjecture that there is a variant of parametricity for Haskell extended with the Key monad in which, in analogy with parametricity for GADTs, |boolBool| and |boolInt| above are considered to be indistinguishable. 
 
 
 \subsection{Termination}
-A fourth desirable property of a type system extension is preservation of termination. What this usually means is that type-safe programs that do not use recursion terminate. Haskell already breaks this property: even without term-level recursion, but allowing type-level recursion, we can create programs that do not terminate. But if we disallow covariant recursion on the type level (i.e.\ type-level recursive occurrences may not occur on the left of a function arrow), then all Haskell programs without term-level recursion do terminate.
+\pablo{Shall we rename this to Normalization?}
+A fourth desirable property of a type system extension is preservation of normalization, i.e.,
+the property that ensures well-typed terms always have a normal form. 
+%What this usually means is that type-safe programs that do not use recursion terminate.
+Although standard typed $\lambda$-calculi (such as System F) are normalizing, Haskell is not. Even without term-level recursion, we can create programs that do not terminate by using type-level recursion. However, if we disallow contravariant recursion at the type level (i.e.\ type-level recursive occurrences that occur to the left of a function arrow), then all Haskell programs without term-level recursion do terminate.
 
-It turns out that adding the Key Monad actually breaks termination, even when we disallow covariant recursion on the type level and recursion at the term level. We show this by implementing a general fixpoint combinator, which uses neither covariant recursion at the type level nor term-level recursion.
+It turns out that extending a normalizing language with the |Key| monad breaks normalization.
+%, even when we disallow covariant recursion on the type level and recursion at the term level. 
+We show this by implementing a general fixpoint combinator |fix| which uses neither contravariant recursion at the type level nor term-level recursion.
 
 \begin{figure}
 \begin{code}
@@ -850,16 +856,16 @@ fix f = runKeyM $
  where unVal (Val x) = x
 \end{code}
 \label{fig:fix}
-\caption{Implementing a general fixpoint combinator without term-level recursion nor type-level covariant recursion}
+\caption{Implementing a general fixpoint combinator without term-level recursion nor type-level contravariant recursion}
 \end{figure}
-
-In Fig.\ \ref{fig:fix} we show how this can be done. First, we introduce a datatype |D s a| for domains representing models of the untyped lambda calculus. (We are going to encode the standard fixpoint combinator |\f -> (\x -> f (x x)) (\x -> f (x x))| in this domain). An element of |D s a| is either a function over |D s a| or a value of type |a|. Normally, we would use covariant recursion for the argument of |Fun|, but we are not allowed to, so we mask it by using a |Box s| instead. As a result, |D s a| is not covariantly recursive, and neither are any of its instances.
+%$
+Fig.\ \ref{fig:fix} presents the implementation of |fix|. First, we introduce a datatype |D s a| for domains representing models of the untyped lambda calculus. (We are going to encode the standard fixpoint combinator |\f -> (\x -> f (x x)) (\x -> f (x x))| in this domain.) An element of |D s a| is either a function over |D s a| or a value of type |a|. Normally, we would use contravariant recursion for the argument of |Fun|, but we are not allowed to, so we mask it by using a |Box s| instead. As a result, |D s a| is not contravariantly recursive, and neither are any of its instances.
 
 Second, we introduce two helper functions: |lam|, which takes a function over the domain, and injects it as an element into the domain, and |app|, which takes two elements of the domain and applies the first argument to the second argument. Both need an extra argument of type |Key s (D s a)| to lock/unlock the forbidden recursive argument.
 
 Third, the fixpoint combinator takes a Haskell function |f|, wraps it onto the domain |D s a| resulting in a function |f'|, and then uses |lam| and |app| to construct a fixpoint combinator from the untyped lambda calculus. Lastly, we need to convert the result from the domain |D s a| back into Haskell-land using |unVal|.
 
-What this shows is that (1) adding the Key Monad to a terminating language may make it non-terminating, (2) the Key Monad is a genuine extension of Haskell without term-level recursion and type-level covariant recursion. Incidentally, this is also the case for the ST monad. In a stratified type system with universe levels, such as Agda or Coq, it should be possible to omit this problem by making keys of a higher level than their assocatied types.
+What this shows is that (1) adding the Key Monad to a terminating language may make it non-terminating, (2) the Key Monad is a genuine extension of Haskell without term-level recursion and type-level contravariant recursion. Incidentally, this is also the case for the ST monad. In a stratified type system with universe levels, such as Agda or Coq, it should be possible to omit this problem by making keys of a higher level than their associated types.
 
 \section{Implementing the Key monad}
 \label{impl}
