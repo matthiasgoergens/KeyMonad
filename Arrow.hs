@@ -13,8 +13,9 @@ newtype Cage s x = Cage { liberate :: KeyMap s -> x }
   deriving (Functor, Applicative)
 
 newtype ArrowSyn a s x =
-    AS (WriterT (EndoA a (KeyMap s)) (KeyM s) x)
+    AS (WriterT (EnvArrow a s) (KeyM s) x)
        deriving (Functor,Applicative,Monad)
+type EnvArrow a s = EndoA a (KeyMap s)
 
 newtype EndoA a x = EndoA (a x x)
 
@@ -40,10 +41,10 @@ withEnv :: Arrow a =>  Cage s x ->
 withEnv c = dup >>> first (elimEnv c)
     where dup = arr (\x -> (x,x))
 
-toEnvA ::  Arrow a =>  
+toEnvArrow ::  Arrow a =>  
            Cage s x  -> Key s y   -> 
-           a x y -> a (KeyMap s) (KeyMap s)
-toEnvA inC outK a  =
+           a x y -> EnvArrow a s
+toEnvArrow inC outK a  = EndoA $ 
    withEnv inC >>> first a >>> extendEnv outK
 
 (-<) :: Arrow a =>
@@ -51,13 +52,13 @@ toEnvA inC outK a  =
         (Cage s x -> ArrowSyn a s (Cage s y))
 a -< inC = AS $
    do  outK <- lift newKey
-       tell (EndoA $ toEnvA inC outK a)
+       tell (toEnvArrow inC outK a)
        return (toCage outK)
 
-fromEnvA ::  Arrow a =>
+fromEnvArrow ::  Arrow a =>
              Key s x   -> Cage s y  ->
-             a (KeyMap s) (KeyMap s) -> a x y
-fromEnvA inK outC a  =
+             EnvArrow a s -> a x y
+fromEnvArrow inK outC (EndoA a)  =
    introEnv inK >>> a >>> elimEnv outC
 
 proc ::  Arrow a =>
@@ -66,8 +67,8 @@ proc ::  Arrow a =>
 proc f = runKeyM $
       do  inK <- newKey
           let AS m = f (toCage inK)
-          (outC, EndoA a) <- runWriterT m
-          return (fromEnvA inK outC a)
+          (outC, a) <- runWriterT m
+          return (fromEnvArrow inK outC a)
 
 makeLoopable :: ArrowLoop a => Key s x -> Cage s x -> a (KeyMap s) (KeyMap s) -> a (KeyMap s, x) (KeyMap s, x)
 makeLoopable k c a = flip >>> extendEnv k >>> a >>> withEnv c >>> flip
@@ -102,6 +103,31 @@ instance (Functor m, Applicative m, Monad m) => RelativeMonad (IdF m) Id where
 -- every relative monad is a monad via the following trick: (Svenningsson and Svensson), who did not 
 -- formulate it as such
 data RmSyn rm v a where
+   Pure :: a -> RmSyn rm v a
+   Unpure :: rm a -> (v a -> RmSyn rm v b) -> RmSyn rm v b
+
+instance Monad (RmSyn rm v) where
+  return = Pure
+  (Pure x) >>= f = f x
+  (Unpure m f) >>= g = Unpure m (\x -> f x >>= g)
+
+fromRm :: RelativeMonad rm v => rm a -> RmSyn rm v (v a)
+fromRm m = Unpure m (return)
+
+toRm :: RelativeMonad rm v => RmSyn rm v (v a) -> rm a
+toRm (Pure x) = rreturn x
+toRm (Unpure m f) = m .>>= (toRm . f)
+ 
+{-
+
+instance RelativeMonad rm v => Monad (RmSyn rm v) where
+  return = Pure
+  (Pure x) >>= f = f x
+  (Unpure m) >>= f = 
+
+  
+
+data RmSyn rm v a where
   Ret  :: a -> RmSyn rm v a
   Lift :: rm a -> RmSyn rm v (v a)
   Bind :: RmSyn rm v a -> (a -> RmSyn rm v b) -> RmSyn rm v b
@@ -111,7 +137,7 @@ desugar (Ret x) = rreturn x
 -- remove pure computations
 desugar (Bind (Ret x) f) = desugar (f x)
 desugar (Bind (Lift m) f) = m .>>= (desugar . f)
-
+-}
 
 class RelativeMonad m v => RelativeMonadFix m v where
   rmfix :: (v a -> m a) -> m a

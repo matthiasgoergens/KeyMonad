@@ -27,6 +27,7 @@
 %format .>>= = "\cdot\!\!\!\bind"
 %format .>> = "\cdot\!\!>\!\!\!>"
 %format getr = "!\:r"
+%format .    = "\circ"
 %format -< = "\prec"
 %format >- = "\succ"
 %format ~ = "\:\sim\:"
@@ -52,18 +53,17 @@
 
 
 \begin{abstract}
-  \atze{This is a quick abstract I wrote for our abstract submission,
-    needs work.}  We present a small extension to Haskell called the
+ We present a small extension to Haskell called the
   Key monad. With the Key monad, unique keys of different types can be
   created and can be tested for equality. When two keys are equal, we
   obtain a proof that their types must also be equal, which gives us a form of
   dynamic typing, without the need for |Typeable| constraints. We
-  show that this extension allows us to do things we could not
-  otherwise do (without unsafe features), namely: implement the |ST| monad, implement an
+  show that this extension allows us to safely do things we could not
+  otherwise do, namely: implement the |ST| monad, implement an
   embedded form of arrow notation in Haskell and translate
   parametric HOAS to typed de Bruijn indices, among others. Although strongly
-  related to the |ST| monad, the Key monad is simpler and, arguably,
-  easier to prove correct. Surprisingly, a full proof of the safety of
+  related to the |ST| monad, the Key monad is simpler and might be 
+  easier to prove correct. We do not provide such a proof of the safety of the Key monad, but we note that, surprisingly, a full proof of the safety of
   the |ST| monad remains elusive to this day. Hence, another reason for
   studying the Key monad is that a correctness proof for it might
   be a stepping stone towards a correctness proof of the ST monad as well.
@@ -148,7 +148,7 @@ unlock k (Lock k' x) =
 \end{code}
 If we used the right key, we get |Just| the value in the box, and we get |Nothing| otherwise.
 
-We can use |Box|es to create a kind of \emph{heterogeneous maps}: a data structure that that maps keys to values of the type corresponding to the key. The interesting feature here is that the type of these heterogenous maps does not depend on the types of the values that are stored in it, nor do the functions have |Typeable| constraints. We can implement such maps straightforwardly as follows\footnote{For simplicity, this is a rather inefficient implementation, but a more efficient implementation (using |IntMap|s) can be given if we use a function |hashKey :: Key s a -> Int|}:
+We can use |Box|es to create a kind of \emph{heterogeneous maps}: a data structure that that maps keys to values of the type corresponding to the key. The interesting feature here is that the type of these heterogenous maps does not depend on the types of the values that are stored in it, nor do the functions have |Typeable| constraints. We can implement such maps straightforwardly as follows\footnote{For simplicity, this is a rather inefficient implementation, but a more efficient implementation (using |IntMap|s) can be given if we add a slightly unsafe function |hashKey :: Key s a -> Int| to the Key monad.}:
 \begin{code}
 newtype KeyMap s = Km [Box s]
 
@@ -167,7 +167,7 @@ lookup k (Km (h : t))  =
 
 \subsection{Implementing the |ST| monad}
 
-Armed with our newly obtained |KeyMap|s, we can implement an (inefficient) monad with the same interface as the |ST| monad as follows. The implementation of |STRef|s is simply as an alias for |Key|s:
+Armed with our newly obtained |KeyMap|s, we can implement an (inefficient) version of the |ST| monad as follows. The implementation of |STRef|s is simply as an alias for |Key|s:
 \begin{code}
 type STRef s a = Key s a
 \end{code}
@@ -186,7 +186,7 @@ newSTRef v = ST $
       return k
 
 readSTRef :: STRef s   a -> ST s a
-readSTRef r = ST $ (getr) `fmap` get
+readSTRef r = ST $ (getr) <$> get
 
 writeSTRef :: STRef s a -> a -> ST s ()
 writeSTRef k v = ST $ modify (insert k v)
@@ -216,9 +216,9 @@ testEquality x y
    | x == unsafeCoerce y  = Just (unsafeCoerce Refl)
    | otherwise            = Nothing
 \end{code}
-Hence, another way to think of this paper is that we claim that the above function is \emph{safe}, that this allows us to do things which we could not do before, and that we propose this as an extension of the |ST| monad library. 
+The |unsafeCoerce| in |x == unsafeCoerce y| is needed because the types of the references might not be the same. Hence, another way to think of this paper is that we claim that the above function is \emph{safe}, that this allows us to do things which we could not do before, and that we propose this as an extension of the |ST| monad library. 
 
-Why is this function safe? The reason is that if two references are the same, then their types must also be the same. This must already be true for |ST| references, because otherwise we could have two references pointing to the same location with different types. Writing to one references and then reading for the other would coerce the value from one type to another! Hence, yet another way of thinking of the Key monad is that it splits this invariant, when two references are the same then their types are the same, into a separate interface and makes reasoning based on this invariant available to the user via |testEquality|.
+Why is this function safe? The reason is that if two references are the same, then their types must also be the same. This invariant must already be true for |ST| references, because otherwise we could have two references pointing to the same location with different types. Writing to one references and then reading for the other would coerce the value from one type to another! Hence, yet another way of thinking of the Key monad is that it splits reasoning based on this invariant into a separate interface and makes it available to the user via |testEquality|.
 
 In the same line of reasoning, it is already possible to implement a similar, but weaker, version of |testEquality| using only the standard |ST| monad functions. If we represent keys of type |Key s a| as a pair of an identifier and an |STRef|s containing values of type |a|, then we can create a function that casts a value of type |a| to |b|, albeit monadically.
 \begin{code}
@@ -251,7 +251,7 @@ For our implementation of the |Key| monad the following holds:
 
 \subsection{Key monad laws}
 
-Informally, the |Key| monad allows us to create new keys and compare them, maybe obtaining a proof of the equality of their associated types. To give a more precise specification and to allow equational reasoning, we also present the Key monad laws shown in Figure \ref{laws}. The |sameKey| and |distinctKey| laws describe the behavior of |testEquality|.
+Informally, the |Key| monad allows us to create new keys and compare them, maybe obtaining a proof of the equality of their associated types. To give a more precise specification and to allow equational reasoning, we also present the Key monad laws shown in Figure \ref{laws}, which we will now briefly discuss. The |sameKey| and |distinctKey| laws describe the behavior of |testEquality|.
 
 \begin{figure}
 \hspace{-0.7cm}
@@ -395,7 +395,7 @@ newtype Cage s x = Cage { liberate :: KeyMap s -> x }
 \end{code}
 Informally, a |Cage| ``contains'' a value of type |x|, but in reality it does not contain a value of type |x| at all: it is a function from a |KeyMap| to a value of type |x|. Hence we can we sure that we do not allow pattern matching on the result of an arrow computation, because the result is simply not available.
 
-In our construction, each result of an arrow via |(-<)| has its own name (|Key|), and |KeyMap|s function as a \emph{enviroments}, i.e. mappings of names to values. A |Cage| is an expression, i.e. a function from environment to value, which may lookup names in the environment. The |Key| monad and the |KeyMap| allow us to model \emph{heterogeneous} environments which can be extended \emph{without changing} the \emph{type} of the environment. This is exactly the extra power we need to define this translation. 
+In our construction, we use |Key|s as names, and and |KeyMap|s \emph{enviroments}, i.e. mappings of names to values.  Each result of an arrow via |(-<)| has its own name. A |Cage| is an expression, i.e. a function from environment to value, which may lookup names in the environment. The |Key| monad and the |KeyMap| allow us to model \emph{heterogeneous} environments which can be extended \emph{without changing} the \emph{type} of the environment. This is exactly the extra power we need to define this translation. 
 
 By using |(-<)| and the monad interface, we can construct the syntax for the arrow computation that we are expressing. Afterwards, we use the following function to convert the syntax to an arrow:
 \begin{code}
@@ -404,11 +404,12 @@ proc ::  Arrow a =>
          -> a x y
 \end{code}
 
-Internally, the |ArrowSyn| monad builds an arrow from environment to environment, and creates names for values in these environments using |KeyM|.
+Internally, the |ArrowSyn| monad builds an \emph{environment arrow}, an arrow from environment to environment, i.e. an arrow of type |a (KeyMap s) (KeyMap s)|. The |ArrowSyn| monad creates names for values in these environments using |KeyM|.
 \begin{code}
 newtype ArrowSyn a s x =
-    AS (WriterT (EndoA a (KeyMap s)) (KeyM s) x)
+    AS (WriterT (EnvArrow a s) (KeyM s) x)
        deriving (Functor,Applicative,Monad)
+type EnvArrow a s = EndoA a (KeyMap s)
 \end{code}
 Where |EndoA a x| is an arrow from a type |x| to the same type:
 \begin{code}
@@ -426,7 +427,7 @@ The standard writer monad transformer, |WriterT|, produces |mempty| for |return|
 
 
 
-To define the operations |proc| and |(-<)|, we first define some auxiliary arrows for manipulating environments. 
+To define the operations |proc| and |(-<)|, we first define some auxiliary functions for manipulating environments. 
 We can easily convert a name (|Key|) to the expression (|Cage|) which consists of looking up that name in the environment:
 \begin{code}
 toCage :: Key s a -> Cage s a
@@ -454,38 +455,38 @@ withEnv c = dup >>> first (elimEnv c)
     where dup = arr (\x -> (x,x))
 \end{code}
 
-With these auxiliary arrows, we can define functions that convert back and forth between a regular arrow and an arrow from environment to environment. To implement |(-<)|, we need to convert an arrow to an arrow from environment to environment, for which we need an expression for the input to the arrow, and a name for the output of the arrow:
+With these auxiliary arrows, we can define functions that convert back and forth between a regular arrow and a environment arrow. To implement |(-<)|, we need to convert an regular arrow to an environment arrow, for which we need an expression for the input to the arrow, and a name for the output of the arrow:
 \begin{code}
-toEnvA ::  Arrow a =>  
+toEnvArrow ::  Arrow a =>  
            Cage s x  -> Key s y   -> 
-           a x y -> a (KeyMap s) (KeyMap s)
-toEnvA inC outK a  =
+           a x y -> EnvArrow a s
+toEnvArrow inC outK a  = EndoA $ 
    withEnv inC >>> first a >>> extendEnv outK
 \end{code}
 We first produce the input to the argument arrow, by interpreting the input expression using the input environment. We then execute the argument arrow, and bind its output to the given name to obtain the output environment. 
 
-The |-<| operation get the arrow and the input expression as an argument, creates a name for the output, and then passes these three to |toEnvA|:
+The |-<| operation get the arrow and the input expression as an argument, creates a name for the output, and then passes these three to |toEnvArrow|:
 \begin{code}
 (-<) :: Arrow a =>
         a x y ->
         (Cage s x -> ArrowSyn a s (Cage s y))
 a -< inC = AS $
    do  outK <- lift newKey
-       tell (EndoA $ toEnvA inC outK a)
+       tell (toEnvArrow inC outK a)
        return (toCage outK)
 \end{code}
 
-In the other direction, to implement |proc| we need to convert an arrow from environment to environment back to an arrow of type |x| to type |y|, for which we instead need the name of the input and an expression for the output:
+In the other direction, to implement |proc| we need to convert an environment arrow to a regular arrow, for which we instead need the name of the input and an expression for the output:
 \begin{code}
-fromEnvA ::  Arrow a =>
+fromEnvArrow ::  Arrow a =>
              Key s x   -> Cage s y  ->
-             a (KeyMap s) (KeyMap s) -> a x y
-fromEnvA inK outC a  =
+             EnvArrow a s -> a x y
+fromEnvArrow inK outC (EndoA a)  =
    introEnv inK >>> a >>> elimEnv outC
 \end{code}
 We first bind the input to the given name to obtain the input environment. We then transform this environment to the output environment by running the arrow from environment to environment. Finally, we interpret the output expression in the output environment to obtain the output.
 
-The |proc| operation creates a name for the input and passes it to the function as an expression to obtain the output expression and the arrow from environment to environment. We then convert the obtained arrow from environment to environment using |fromEnvA|:
+The |proc| operation creates a name for the input and passes it to the function as an expression to obtain the output expression and the environment arrow. We then convert the obtained arrow from environment to environment using |fromEnvArrow|:
 \begin{code}
 proc ::  Arrow a =>
              (forall s. Cage s x -> ArrowSyn a s (Cage s y)) ->
@@ -493,27 +494,55 @@ proc ::  Arrow a =>
 proc f = runKeyM $
       do  inK <- newKey
           let AS m = f (toCage inK)
-          (outC, EndoA a) <- runWriterT m
-          return (fromEnvA inK outC a)
+          (outC, a) <- runWriterT m
+          return (fromEnvArrow inK outC a)
 \end{code} 
 
 \subsection{Discussion}
 
-Because all the operations in the |ArrowSyn| return a |Cage|, it not possible to observe the output of an arrow computation to decide what to do next. While we cannot decide what to do next based on the output of a computation of type |ArrowSyn s (Cage s x)|, we can, for example, decide what to next based on the outcome of a computation of type |ArrowSyn s Int|. This does not give our embedded arrow notation more power than regular arrow notation: the value of the integer cannot depend on the result of an arrow computation and hence must be the result of a pure computation. This essentially the same trick as described in Svenningsson and Svensson\cite{bjorn}.
-
-While the above construction is a monad, it is also possible to make a similar construction for arrows which is a \emph{relative monad}\cite{relmonad}. A relative monad is an instance of the following type class:
+Altenkrich, Chapman and Uustalu\cite{relmonad} show a related construction: that in category theory arrows are a special case of relative monads, which are themselves a generalization of monads. A relative monad is an instance of the following type class:
 \begin{code}
-class RelMonad m v where
+class RelativeM m v where
   rreturn  :: v x -> m x
   (.>>=)   :: m x -> (v x -> m y) -> m y
 \end{code}
-The only difference with the regular monad type class is that the values are now wrapped in a type constructor |v|. We can construct a similar construction as |ArrowSyn| as follows:
+However, the construction of Altenkrirch et al.  construction is not a relative monad in Haskell, only in category theory. In particular their definition uses the Yoneda embedding, which does not allow us freely use bound values, instead it requires us to manually lift values into scope, in the same fashion as directly using de Bruijn indices. 
+
+Because all the operations in |ArrowSyn| (namely |(-<)|) return a |Cage|, it might be more informative to see it as a relative monad, i.e.:
 \begin{code}
 data ArrowRm a s x = ArrowRm 
          (ArrowSyn a s (Cage s x))
-instance RelMonad (ArrowRm a s) (Cage s) where ...
+instance RelativeM (ArrowRm a s) (Cage s) where ...
+
+(-<) :: a x y -> Cage s x -> ArrowRm a s y
+proc :: (forall a. Cage s x -> ArrowRm a s y) -> a x y
 \end{code}
-Altenkrich et al.\cite{relmonad} show that in category theory arrows are a special case of relative monads, but his construction is not a relative monad in Haskell. In particular his definition of bind does not allow us freely use bound values, instead it requires us to manually lift values into scope, in the same fashion as directly using de Bruijn indices. Our construction suggests that arrows are also a special case of relative monad in Haskell with the key monad, but a formal proof (using the Key monad laws from Figure (\ref{laws}) is outside the scope of this paper. In the code online, we also show that this construction can be extended to \emph{relative monadfix} (with function : |rmfix :: (v a -> m a) -> m a|) to |ArrowLoop|, but the we cannot translate monadfix to |ArrowLoop|.
+In this formulation, it is clear that the user cannot decide what to do next based on the outcome of a computation: all we can get from a computation is |Cage|s. 
+The monadic interface does not add extra power: while we cannot decide what to do next based on the output of a computation of type |ArrowSyn s (Cage s x)|, we can, for example, decide what to next based on the outcome of a computation of type |ArrowSyn s Int|. This does not give our embedded arrow notation more power than regular arrow notation or the relative monad interface: the value of the integer cannot depend on the result of an arrow computation and hence must be the result of a pure computation. This essentially the same trick as described in Svenningsson and Svensson\cite{bjorn}. 
+
+As an aside, more generally, this trick can be used to give a monadic interface for \emph{any} relative monad:
+\begin{code}
+data RmM rm v a where
+   Pure :: a -> RmM rm v a
+   Unpure ::  rm a -> (v a -> RmM rm v b) 
+              -> RmM rm v b
+
+instance Monad (RmM rm v) where
+  return = Pure
+  (Pure x) >>= f = f x
+  (Unpure m f) >>= g = Unpure m (\x -> f x >>= g)
+
+fromRm :: RelativeM rm v => rm a -> RmM rm v (v a)
+fromRm m = Unpure m (return)
+
+toRm :: RelativeM rm v => RmM rm v (v a) -> rm a
+toRm (Pure x)      = rreturn x
+toRm (Unpure m f)  = m .>>= (toRm . f)
+\end{code}
+The insight is because a computation monad must eventually return a value of |v a| to convert a relative monad computation via |toRm|, any pure value that is used, can eventually be removed via the monad law |return x >>= f == f x|. Our embedded arrow construction construction can also be seen as relative monad, where we apply this trick to obtain a monadic interface.
+
+Our construction hence suggests that arrows are also a special case of relative monad in Haskell with the key monad, but a formal proof (using the Key monad laws from Figure (\ref{laws}) is outside the scope of this paper. In the code online, we also show that this construction can be extended to \emph{relative monadfix} (with function  |rmfix :: (v a -> m a) -> m a|) to |ArrowLoop|, but the we cannot translate monadfix to |ArrowLoop|.
+
 
 The \emph{Arrow Calculus}\cite{arrowcalc} describes a translation of a form of arrow syntax (not embedded in Haskell) to arrows which is very simillar to the construction presented here. Their calculus has five laws, three of which can be considered to be relative monad laws, which they use to prove the equational correspondance between their calculus and regular arrows. Due to the similarity, their paper should provide a good starting point for anyone trying to prove the same for this construction.
 
