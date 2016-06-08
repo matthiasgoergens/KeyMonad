@@ -965,6 +965,9 @@ Third, the fixpoint combinator takes a Haskell function |f|, wraps it onto the d
 
 What this shows is that (1) adding the Key Monad to a terminating language may make it non-terminating, (2) the Key Monad is a genuine extension of Haskell without term-level recursion and type-level covariant recursion. Incidentally, this is also the case for the ST-monad.
 
+
+\atze{From the discussion in 6.3 it follows that here we create the cyclic type |s ~ Single (D s a) :++: Empty|
+
 \section{Discussion on the ST-monad}
 \label{stdis}
 The ST-monad was introduced in \cite{stmonad} and contained some correctness statements and also a high-level description of a proof. The proof sketch mentions the use of parametricity, which is a doubtful proof technique to use because it is not established that parametricity still holds for a language with the ST-monad. A follow-up paper \cite{LaunchburySabry} mentions another problem with the first paper, in particular that implementations of the lazy ST-monad may actually generate the wrong result in a setting that is more eager. This paper claims to fix those issues with a new semantics and proof sketch. However, a bug in this correctness proof was discovered, which lead to a series of papers formalizing the treatment of different versions of encapsulating strict and lazy state threads in a functional language, culminating in \cite{MoggiSabry}. This paper gives different formulations of strict and lazy state threads, one of them corresponding to lazy state threads in Haskell. The aim of the paper is to establish {\em type safety} of state threads. However, the paper only provides a proof sketch of type safety for one of the formulations, and only claims type safety (without a proof) for the other ones.
