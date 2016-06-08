@@ -27,7 +27,6 @@
 %format .>>= = "\cdot\!\!\!\bind"
 %format .>> = "\cdot\!\!>\!\!\!>"
 %format getr = "!\:r"
-%format .    = "\circ"
 %format -< = "\prec"
 %format >- = "\succ"
 %format ~ = "\:\sim\:"
@@ -537,11 +536,11 @@ fromRm m = Unpure m (return)
 
 toRm :: RelativeM rm v => RmM rm v (v a) -> rm a
 toRm (Pure x)      = rreturn x
-toRm (Unpure m f)  = m .>>= (toRm . f)
+toRm (Unpure m f)  = m .>>= (toRm :. f)
 \end{code}
 The insight is because a computation monad must eventually return a value of |v a| to convert a relative monad computation via |toRm|, any pure value that is used, can eventually be removed via the monad law |return x >>= f == f x|. Our embedded arrow construction can also be seen as relative monad, where we apply this trick to obtain a monadic interface.
 
-Our construction hence suggests that arrows are also a special case of relative monad in Haskell with the key monad, but a formal proof (using the Key monad laws from Figure (\ref{laws}) is outside the scope of this paper. In the code online, we also show that this construction can be extended to \emph{relative monadfix} (with function  |rmfix :: (v a -> m a) -> m a|) to |ArrowLoop|, but the we cannot translate monadfix to |ArrowLoop|.
+Our construction hence suggests that arrows are also a special case of relative monad in Haskell with the key monad, but a formal proof (using the Key monad laws from Figure (\ref{laws}) is outside the scope of this paper. In the code online, we also show that this construction can be extended to use \emph{relative monadfix} (with function  |rmfix :: (v a -> m a) -> m a|) to construction arrows using |ArrowLoop|, but the we cannot use recursive monad notation in this case, because the above trick does not extend to Monadfix.
 
 
 The \emph{Arrow Calculus}\cite{arrowcalc} describes a translation of a form of arrow syntax (not embedded in Haskell) to arrows which is very simillar to the construction presented here. Their calculus has five laws, three of which can be considered to be relative monad laws, which they use to prove the equational correspondance between their calculus and regular arrows. Due to the similarity, their paper should provide a good starting point for anyone trying to prove the same for this construction.
