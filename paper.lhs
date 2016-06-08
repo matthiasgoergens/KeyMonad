@@ -54,20 +54,19 @@
 \begin{abstract}
   \atze{This is a quick abstract I wrote for our abstract submission,
     needs work.}  We present a small extension to Haskell called the
-  Key monad. In the Key monad, unique keys of different types can be
+  Key monad. With the Key monad, unique keys of different types can be
   created and can be tested for equality. When two keys are equal, we
-  obtain a proof that their types must also be equal. This gives us
-  dynamic typing, but without the need for |Typeable| constraints. We
+  obtain a proof that their types must also be equal, which gives us a form of
+  dynamic typing, without the need for |Typeable| constraints. We
   show that this extension allows us to do things we could not
   otherwise do (without unsafe features), namely: implement the |ST| monad, implement an
   embedded form of arrow notation in Haskell and translate
-  parametric HOAS to typed de Bruijn indices. Although strongly
+  parametric HOAS to typed de Bruijn indices, among others. Although strongly
   related to the |ST| monad, the Key monad is simpler and, arguably,
   easier to prove correct. Surprisingly, a full proof of the safety of
   the |ST| monad remains elusive to this day. Hence, another reason for
   studying the Key monad is that a correctness proof for it might
-  conceivably be a stepping stone towards a correctness proof
-  of the ST monad as well.
+  be a stepping stone towards a correctness proof of the ST monad as well.
 \end{abstract}
 
 
@@ -219,7 +218,7 @@ testEquality x y
 \end{code}
 Hence, another way to think of this paper is that we claim that the above function is \emph{safe}, that this allows us to do things which we could not do before, and that we propose this as an extension of the |ST| monad library. 
 
-Why is this function safe? The reason is that if two references are the same, then their types must also be the same. This must already be true for |ST| references, because otherwise we could have two references pointing to the same location with different types. Writing to one references and then reading for the other would coerce the value from one type to another!
+Why is this function safe? The reason is that if two references are the same, then their types must also be the same. This must already be true for |ST| references, because otherwise we could have two references pointing to the same location with different types. Writing to one references and then reading for the other would coerce the value from one type to another! Hence, yet another way of thinking of the Key monad is that it splits this invariant, when two references are the same then their types are the same, into a separate interface and makes reasoning based on this invariant available to the user via |testEquality|.
 
 In the same line of reasoning, it is already possible to implement a similar, but weaker, version of |testEquality| using only the standard |ST| monad functions. If we represent keys of type |Key s a| as a pair of an identifier and an |STRef|s containing values of type |a|, then we can create a function that casts a value of type |a| to |b|, albeit monadically.
 \begin{code}
@@ -1018,10 +1017,10 @@ Again, these two types are \emph{not} equivalent: the latter implies the former,
 For this reason, the type that is bound to |q| is \emph{the same type} for all values of |TNameSupply p s|. Hence, it should be safe to coerce the argument from the former type to the later type. However, formalizing this through types seems unlikely. One could try formalizing the abstractness of the name supply by making the implementation polymorphic in the implementation of the name supply and names. One would then also need to formalize the exact behavior of the name supply, for example that the name supply acts in exactly the same way as the implementation with paths in trees. This property, cannot be encoded in the Haskell type system (yet), since it requires the types to constraint the exact behavior of functions in the implementation, which requires dependent typing.  Moreover, as far as we know it is already impossible to prove the following simpler property (which holds by parametricity) in Haskell: |(forall f. f x -> exists q. g q) -> (forall f. exists q. f x -> g q)|. Finally, when a computation creates an infinite number of keys, this will also lead to an \emph{infinite} type, which is not allowed in the Haskell type system. For these reasons, we feel that it is highly unlikely that the |Key| monad can be expressed in pure Haskell.
 
 
-\section{Discussion on the ST monad}
+\section{Discussion on the ST monad proof}
 \label{stdis}
 
-The ST monad was introduced in \cite{stmonad} and contained some correctness statements and also a high-level description of a proof. The proof sketch mentions the use of parametricity, which is a doubtful proof technique to use because it is not established that parametricity still holds for a language with the ST monad. A follow-up paper \cite{LaunchburySabry} mentions another problem with the first paper, in particular that implementations of the lazy ST monad may actually generate the wrong result in a setting that is more eager. This paper claims to fix those issues with a new semantics and proof sketch. However, a bug in this correctness proof was discovered, which lead to a series of papers\cite{LaunchburySabry,AriolaSabry} formalizing the treatment of different versions of encapsulating strict and lazy state threads in a functional language, culminating in \cite{MoggiSabry}. This paper gives different formulations of strict and lazy state threads, one of them corresponding to lazy state threads in Haskell. The aim of the paper is to establish {\em type safety} of state threads. However, the paper only provides a proof sketch of type safety for one of the formulations, and only claims type safety (without a proof) for the other ones. With the execption of the original paper\cite{stmonad}, all these papers consider only \emph{local state}, that is, each state thread has its own memory, in contrast to the actual implementation of the |ST| monad.
+The ST monad was introduced in \cite{stmonad} and contained some correctness statements and also a high-level description of a proof. The proof sketch mentions the use of parametricity, which is a doubtful proof technique to use because it is not established that parametricity still holds for a language with the ST monad. A follow-up paper \cite{LaunchburySabry} mentions another problem with the first paper, in particular that implementations of the lazy ST monad may actually generate the wrong result in a setting that is more eager. This paper claims to fix those issues with a new semantics and proof sketch. However, a bug in this correctness proof was discovered, which lead to a series of papers\cite{LaunchburySabry,AriolaSabry} formalizing the treatment of different versions of encapsulating strict and lazy state threads in a functional language, culminating in \cite{MoggiSabry}. This paper gives different formulations of strict and lazy state threads, one of them corresponding to lazy state threads in Haskell. The aim of the paper is to establish {\em type safety} of state threads. However, the paper only provides a proof sketch of type safety for one of the formulations, and only claims type safety (without a proof) for the other ones. With the exception of the original paper\cite{stmonad}, all these papers consider only \emph{local state}, that is, each state thread has its own memory, in contrast to the actual implementation of the |ST| monad.
 
 Even if type safety may now be considered to have been established by these papers, we are still left with referential transparency and abstraction safety. We are unaware of any work that attempts to establish parametricity or referential transparency in the presence of the |ST| monad. Referential transparency is quite tricky for actual implementations of the ST monad since efficient implementations use global pointers. Abstraction safety is also very important because most people assume that parametricity in Haskell actually holds, without giving it a second thought that the ST monad may destroy it. 
 
@@ -1029,7 +1028,7 @@ Now, we actually believe that the ST monad (and also the Key Monad) is correct i
 
 \section{Conclusion}
 
-\atze{Here should be some repetition.}
+In the ST monad, one of the invariants that must hold that when two references are the same, then their types must also be the same. We presented the Key monad, which splits reasoning based on this invariant into a separate interface, and makes it available to user. We showed that this new interface gives a form of dynamic typing without the need for |Typeable| constraints, which allows us to do things we could not do before: implement the ST monad, implement an embedded form of arrow syntax and translate parametric Hoas to typed de Bruijn indices. The Key monad is simpler than the ST monad, since it embodies just one aspect of it. A proof of the safety of the Key might  be a stepping stone towards a full proof of the safety ST monad as well, which remains elusive to this day.
 
 \label{conc}
 \bibliographystyle{apalike}
