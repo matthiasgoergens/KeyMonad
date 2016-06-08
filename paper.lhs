@@ -71,6 +71,8 @@
 
 \section{Introduction}
 
+\pablo{Why do we say 'ST monad' but 'Key Monad'? The capitalisation is inconsistent. I think we should go for 'Key monad' but I don't mind as long as we use the same for both. Also check that sometimes ST appears in italics.}
+
 The |ST| monad \cite{stmonad} in Haskell is an impressive feat of language design, but also a complicated beast. It provides and combines three separate features: (1) an abstraction for {\em global memory references} that can be efficiently written to and read from, (2) a mechanism for embedding computations involving these memory references in {\em pure computations}, and (3) a design that allows references in the same computation to be of {\em arbitrary, different types}, in a type-safe manner.
 
 \begin{figure}[t]
@@ -499,13 +501,13 @@ proc f = runKeyM $
 
 \subsection{Discussion}
 
-Altenkrich, Chapman and Uustalu\cite{relmonad} show a related construction: that in category theory arrows are a special case of relative monads, which are themselves a generalization of monads. A relative monad is an instance of the following type class:
+Altenkirch, Chapman and Uustalu\cite{relmonad} show a related construction: that in category theory arrows are a special case of relative monads, which are themselves a generalization of monads. A relative monad is an instance of the following type class:
 \begin{code}
 class RelativeM m v where
   rreturn  :: v x -> m x
   (.>>=)   :: m x -> (v x -> m y) -> m y
 \end{code}
-However, the construction of Altenkrirch et al.  construction is not a relative monad in Haskell, only in category theory. In particular their definition uses the Yoneda embedding, which does not allow us freely use bound values, instead it requires us to manually lift values into scope, in the same fashion as directly using de Bruijn indices. 
+However, the construction of Altenkirch et al.  construction is not a relative monad in Haskell, only in category theory. In particular their definition uses the Yoneda embedding, which does not allow us freely use bound values, instead it requires us to manually lift values into scope, in the same fashion as directly using de Bruijn indices. 
 
 Because all the operations in |ArrowSyn| (namely |(-<)|) return a |Cage|, it might be more informative to see it as a relative monad, i.e.:
 \begin{code}
@@ -738,25 +740,28 @@ instance PFunctor (TList l) where
 \end{code}
 \label{ccc}
 \caption{Translating lambda terms to Cartesian closed categories.}
-
+%$
 \end{figure}
 
 
 \section{Safety of the |Key| monad}
 \label{safety}
 
-
-In this section, we more precisely state what we mean by safety, and informally argue for the safety of the key monad.
+In this section, we precisely state what we mean by safety, and informally argue for the safety of the |Key| monad.
 
 \subsection{Type safety}
 
-The first safety property that we conjecture the Key monad has is \emph{type safety}: |testEquality| will never allow us to proof |a :~: b| for two \emph{distinct} types. Informally the reason for this is that a key value |i| and a scope type variable |s| together \emph{uniquely determine} the associated type |a| of a key, and hence when two key values and scope type variables are the same, their associated types \emph{must be the same}. 
+\pablo{I think we should define the term \emph{scope type variable};
+  as it stands it just looks like a typo since there is a standard
+  phrase 'scoped type variable' (for a different extension).}
 
-The scope type variable |s| and the key value |i| together unique determine that associated type |a| for three reasons:
+The first safety property that we conjecture the Key monad has is \emph{type safety}: |testEquality| will never allow us to prove that |a :~: b| if |a| and |b| are \emph{distinct} types. Informally, the justification for this is that a key value |k| of type |Key s a| together with its scope type variable |s| \emph{uniquely determine} the associated type |a| of the key. Hence, when two key values and scope type variables are the same\footnote{Even though users cannot compare keys explicitly, implementations of the |Key| monad internally represent keys by some underlying value that can be compared for equality..}, their associated types \emph{must be the same} as well. 
+
+The argument why the scope type variable |s| and the key value |k| together uniquely determine type |a| goes as follows:
 \begin{enumerate}
-\item Each execution of a |Key| monad computation has a scope type variable |s| that is distinct from the scope type variables of all other |Key| monad computations. This is ensured by the type of |runKeyM|, namely |(forall s. KeyM s a) -> a|, which states that the type |s| must cannot be unified with any other type. 
-\item Each |newKey| operation in such a |Key| monad computation gives a value that is unique within the scope |s|, i.e. distinct from other keys created in the same computation.
-\item Each key only has \emph{a single type} associated with it. This is ensured by the type of |newKey|, which only allows us to construct a key with a single type, i.e. not a key of type |forall a. Key s a|, because |createPolymorphicKey :: KeyM (forall a. Key s a)| does not unify with the type of |newKey|. 
+\item Each execution of a |Key| monad computation has a scope type variable |s| that is distinct from the scope type variables of all other |Key| monad computations. This is ensured by the type of |runKeyM|, namely |(forall s. KeyM s a) -> a|, which states that the type |s| cannot be unified with any other type. 
+\item Each |newKey| operation in such a |Key| monad computation gives a value that is unique within the scope determined by |s|, i.e. distinct from other keys created in the same computation.
+\item Each key only has \emph{a single type} associated with it. This is ensured by the type of |newKey|, which only allows us to construct a key with a single type, i.e. not a key of type |forall a. Key s a|, because the type of a potential function |createPolymorphicKey :: KeyM (forall a. Key s a)| would not unify with the type of |newKey|. 
 \end{enumerate}
 
 
