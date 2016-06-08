@@ -539,7 +539,7 @@ toRm :: RelativeM rm v => RmM rm v (v a) -> rm a
 toRm (Pure x)      = rreturn x
 toRm (Unpure m f)  = m .>>= (toRm . f)
 \end{code}
-The insight is because a computation monad must eventually return a value of |v a| to convert a relative monad computation via |toRm|, any pure value that is used, can eventually be removed via the monad law |return x >>= f == f x|. Our embedded arrow construction construction can also be seen as relative monad, where we apply this trick to obtain a monadic interface.
+The insight is because a computation monad must eventually return a value of |v a| to convert a relative monad computation via |toRm|, any pure value that is used, can eventually be removed via the monad law |return x >>= f == f x|. Our embedded arrow construction can also be seen as relative monad, where we apply this trick to obtain a monadic interface.
 
 Our construction hence suggests that arrows are also a special case of relative monad in Haskell with the key monad, but a formal proof (using the Key monad laws from Figure (\ref{laws}) is outside the scope of this paper. In the code online, we also show that this construction can be extended to \emph{relative monadfix} (with function  |rmfix :: (v a -> m a) -> m a|) to |ArrowLoop|, but the we cannot translate monadfix to |ArrowLoop|.
 
