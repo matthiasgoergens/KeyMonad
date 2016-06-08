@@ -755,7 +755,7 @@ In this section, we precisely state what we mean by safety, and informally argue
   as it stands it just looks like a typo since there is a standard
   phrase 'scoped type variable' (for a different extension).}
 
-The first safety property that we conjecture the Key monad has is \emph{type safety}: |testEquality| will never allow us to prove that |a :~: b| if |a| and |b| are \emph{distinct} types. Informally, the justification for this is that a key value |k| of type |Key s a| together with its scope type variable |s| \emph{uniquely determine} the associated type |a| of the key. Hence, when two key values and scope type variables are the same\footnote{Even though users cannot compare keys explicitly, implementations of the |Key| monad internally represent keys by some underlying value that can be compared for equality..}, their associated types \emph{must be the same} as well. 
+The first safety property that we conjecture the Key monad has is \emph{type safety}: |testEquality| will never allow us to prove that |a :~: b| if |a| and |b| are \emph{distinct} types. Informally, the justification for this is that a key value |k| of type |Key s a| together with its scope type variable |s| \emph{uniquely determine} the associated type |a| of the key. Hence, when two key values and scope type variables are the same\footnote{Even though users cannot compare keys explicitly, implementations of the |Key| monad internally represent keys by some underlying value that can be compared for equality.}, their associated types \emph{must be the same} as well. 
 
 The argument why the scope type variable |s| and the key value |k| together uniquely determine type |a| goes as follows:
 \begin{enumerate}
