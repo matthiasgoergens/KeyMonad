@@ -370,7 +370,7 @@ addA f g = proc $ \z -> do
     y <- g -< z
     return $ (+) <$> x <*> y
 \end{code}
-We use a function conveniently called |proc| and use an infix function conviently called |(-<)|.
+We use a function conveniently called |proc| and use an infix function conveniently called |(-<)|.
 
 The difference between |do| notation and arrow notation is that in arrow notation, one cannot observe intermediate values to decide what to do next. For example, we \emph{cannot} do the following:
 \begin{code}
@@ -769,13 +769,13 @@ The argument why the scope type variable |s| and the key value |k| together uniq
 
 \subsection{Referential transparency} 
 
-The second safety property that we are concerned with is \emph{referential transparency}: more specifically does the following still hold with the key monad extension:
+The second safety property that we are concerned with is \emph{referential transparency}. More specifically, in an otherwise pure language with the |Key| monad extension, does the following still hold?
 \begin{code}
 let x = e in (x,x) ==  (e,e) 
 \end{code}
 
-Our implementation of the key monad only relies on \emph{unsafeCoerce}; it does not use \emph{unsafePerformIO} and hence referential transparency cannot be broken by this implementation. Since the |ST| monad can be implemented using the |Key| monad, the same can be said for the |ST| monad. 
-However, more efficient implementations of |Key| monad as well as the |ST| monad use \emph{globally unique} identifiers and \emph{global} pointers respectively, which does rely on potentially referential transparency breaking features. 
+In other words, referential transparency means that an expression always evaluates to the same result in any context. Our implementation of the key monad only relies on \emph{unsafeCoerce}; it does not use \emph{unsafePerformIO} and hence referential transparency cannot be broken by this implementation. \pablo{This is a little dodgy: unsafePerformIO can be implemented with just unsafeCoerce.} Since the |ST| monad can be implemented using the |Key| monad, the same can be said for the |ST| monad. 
+However, more efficient implementations of |Key| monad as well as the |ST| monad use \emph{globally unique} identifiers and \emph{global} pointers respectively, which does rely on features that might potentially break referential transparency. 
 
 
 \subsection{Abstraction safety} 
