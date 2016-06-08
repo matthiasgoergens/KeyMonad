@@ -59,12 +59,12 @@
   dynamic typing, but without the need for Typeable constraints. We
   show that this extension allows us to do things we could not
   otherwise do
-  without unsafe features, namely: to implement the ST monad, to implement an
+  without unsafe features, namely: to implement the |ST| monad, to implement an
   embedded form of arrow notation in Haskell and to translate
   parametric HOAS to typed de Bruijn indices. Although strongly
-  related to the ST monad, the Key monad is simpler and, arguably,
+  related to the |ST| monad, the Key monad is simpler and, arguably,
   easier to prove correct. Surprisingly, a full proof of the safety of
-  the ST monad remains elusive to this day. Hence, another reason for
+  the |ST| monad remains elusive to this day. Hence, another reason for
   studying the Key monad is that a correctness proof for it might
   conceivably be a stepping stone towards a correctness proof
   of the ST monad as well.
@@ -73,7 +73,7 @@
 
 \section{Introduction}
 
-The |ST|-monad \cite{stmonad} in Haskell is an impressive feat of language design, but also a complicated beast. It provides and combines three separate features: (1) an abstraction for {\em global memory references} that can be efficiently written to and read from, (2) a mechanism for embedding computations involving these memory references in {\em pure computations}, and (3) a design that allows references in the same computation to be of {\em arbitrary, different types}, in a type-safe manner.
+The |ST| monad \cite{stmonad} in Haskell is an impressive feat of language design, but also a complicated beast. It provides and combines three separate features: (1) an abstraction for {\em global memory references} that can be efficiently written to and read from, (2) a mechanism for embedding computations involving these memory references in {\em pure computations}, and (3) a design that allows references in the same computation to be of {\em arbitrary, different types}, in a type-safe manner.
 
 \begin{figure}[t]
 \rule{\columnwidth}{0.4pt}
@@ -95,7 +95,7 @@ data a :~: b where Refl :: a :~: a
 In this paper, we attempt to provide a new abstraction in Haskell that
 embodies only feature (3) above: the combination of references (which we call {\em keys}) of different, unconstrainted types in the same computation. The result is a small library called {\em the Key Monad}. The API is given in Fig.\ \ref{fig:key-monad}.
 
-The Key Monad |KeyM| is basically a crippled version of the |ST|-monad: we can monadically create keys of type |Key s a| using the function |newKey|, but we cannot read or write values to these keys; in fact, keys do not carry any values at all. We can convert a computation in |KeyM| into a pure value by means of |runKeyM|, which requires the argument computation to be polymorphic in |s|, just like |runST| would.
+The Key Monad |KeyM| is basically a crippled version of the |ST| monad: we can monadically create keys of type |Key s a| using the function |newKey|, but we cannot read or write values to these keys; in fact, keys do not carry any values at all. We can convert a computation in |KeyM| into a pure value by means of |runKeyM|, which requires the argument computation to be polymorphic in |s|, just like |runST| would.
 
 The only new feature is the function |testEquality|, which compares two keys for equality. But the keys do not have to be of the same type! They just have to come from the same |KeyM| computation, indicated by the |s| argument. If two keys are not equal, the answer is |Nothing|. However, if two keys are found to be equal, {\em then their types should also be the same}, and the answer is |Just Refl|, where |Refl| is a constructor from the GADT |a :~: b| that functions as the ``proof'' that |a| and |b| are in fact the same type\footnote{It is actually possible to add |testEquality| to the standard interface of |STRef|s, which would provide much the same features in the ST monad as the Key Monad would, apart from some laziness issues. However, because of its simplicity, we think the Key Monad is interesting in its own right.}.
 
@@ -117,15 +117,15 @@ Our contributions are as follows:
 \item We present the Key monad (Section \ref{keym}).
 \item We show that added power of the Key monad allows us to do things we cannot do without it, namely:
      \begin{itemize}
-          \item Implement the |ST|-monad (Section \ref{keym}).
+          \item Implement the |ST| monad (Section \ref{keym}).
           \item Implement an \emph{embedded} form of arrow notation (Section \ref{arrow}).
           \item Represent typed variables in typed representations of syntax (Section \ref{syntax}).
           \item Translate parametric Hoas to nested de Bruijn indices, which allows interpretations of parametric Hoas terms, such translation to cartesian closed categories, which are not possible otherwise (Section \ref{syntax}).
 \end{itemize}
 \item We present an argument why the Key monad is not expressible in Haskell (without |unsafeCoerce|) (Section \ref{impl}).
-\item We argue that the safety of the Key monad is just as, if not more, likely than the safety of the |ST|-monad (Section \ref{safety}).
+\item We argue that the safety of the Key monad is just as, if not more, likely than the safety of the |ST| monad (Section \ref{safety}).
 \end{itemize}
-We discuss the state of the proof of the safety of the |ST|-monad in section \ref{stdis} and we conclude in Section \ref{conc}.
+We discuss the state of the proof of the safety of the |ST| monad in section \ref{stdis} and we conclude in Section \ref{conc}.
 
 \section{The Key Monad}
 \label{keym}
@@ -220,9 +220,9 @@ testEquality x y
    | x == y     = Just (unsafeCoerce Refl)
    | otherwise  = Nothing
 \end{code}
-Hence, another way to think of this paper is that we claim that the above function is \emph{safe}, that this allows us to do things which we could not do before, and that we propose this as an extension of the |ST|-monad library.
+Hence, another way to think of this paper is that we claim that the above function is \emph{safe}, that this allows us to do things which we could not do before, and that we propose this as an extension of the |ST| monad library.
 
-It \emph{is} possible to implement a similar, but weaker, version of |testEquality| using only the standard |ST|-monad functions. If we represent keys of type |Key s a| as a pair of an identifier and an |STRef|s containing values of type |a|, then we can create a function that casts a value of type |a| to |b|, albeit monadically.
+It \emph{is} possible to implement a similar, but weaker, version of |testEquality| using only the standard |ST| monad functions. If we represent keys of type |Key s a| as a pair of an identifier and an |STRef|s containing values of type |a|, then we can create a function that casts a value of type |a| to |b|, albeit monadically.
 \begin{code}
 data Key s a = Key{ ident :: STRef s (), ref :: STRef s a }
 
@@ -982,7 +982,7 @@ Third, the fixpoint combinator takes a Haskell function |f|, wraps it onto the d
 What this shows is that (1) adding the Key Monad to a terminating language may make it non-terminating, (2) the Key Monad is a genuine extension of Haskell without term-level recursion and type-level covariant recursion. Incidentally, this is also the case for the ST monad.
 
 
-\atze{From the discussion in 6.3 it follows that here we create the cyclic type |s ~ Single (D s a) :++: Empty|
+\atze{From the discussion in 6.3 it follows that here we create the cyclic type |s ~ Single (D s a) :++: Empty|}
 
 \section{Discussion on the ST monad}
 \label{stdis}
