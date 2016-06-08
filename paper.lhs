@@ -51,8 +51,23 @@
 
 
 \begin{abstract}
-\atze{This is a quick abstract I wrote for our abstract submission, needs work.}
-We present a small extension to Haskell called the Key monad. In the Key monad, unique keys of different types can be created and can be tested for equality. When two keys are equal, a proof is given that their types must also be equal. This gives us dynamic typing, but without the need for typeable constraints. We show that this extension allows us to do things we could not do without it, namely: implement the ST-monad, implement an embedded form of arrow notation in Haskell and translate parametric Hoas to typed de Bruijn indices. The Key monad is strongly related to the ST monad, but is simpler. Surprisingly, a full proof of the safety of the ST-monad remains elusive to this day. Hence, another reason for studying the Key monad is that a correctness proof for the Key monad could be much simpler than a correctness proof and such a proof would conceivably lead to a correctness proof of the ST-monad as well.
+  \atze{This is a quick abstract I wrote for our abstract submission,
+    needs work.}  We present a small extension to Haskell called the
+  Key monad. In the Key monad, unique keys of different types can be
+  created and can be tested for equality. When two keys are equal, we
+  can get a proof that their types must also be equal. This gives us
+  dynamic typing, but without the need for Typeable constraints. We
+  show that this extension allows us to do things we could not
+  otherwise do
+  without unsafe features, namely: to implement the ST monad, to implement an
+  embedded form of arrow notation in Haskell and to translate
+  parametric HOAS to typed de Bruijn indices. Although strongly
+  related to the ST monad, the Key monad is simpler and, arguably,
+  easier to prove correct. Surprisingly, a full proof of the safety of
+  the ST monad remains elusive to this day. Hence, another reason for
+  studying the Key monad is that a correctness proof for it might
+  conceivably be a stepping stone towards a correctness proof
+  of the ST monad as well.
 \end{abstract}
 
 
@@ -77,24 +92,25 @@ data a :~: b where Refl :: a :~: a
 \label{fig:key-monad}
 \end{figure}
 
-In this paper, we attempt to provide a new abstraction in Haskell that only provides feature (3) above: the combination of references (which we call {\em keys}) of different, unconstrainted types in the same computation. The result is a small library called {\em the Key Monad}. The API is given in Fig.\ \ref{fig:key-monad}.
+In this paper, we attempt to provide a new abstraction in Haskell that
+embodies only feature (3) above: the combination of references (which we call {\em keys}) of different, unconstrainted types in the same computation. The result is a small library called {\em the Key Monad}. The API is given in Fig.\ \ref{fig:key-monad}.
 
-The Key Monad |KeyM| is basically a crippled version of the |ST|-monad: we can monadically create keys of type |Key s a| using the function |newKey|, but we cannot read or write values to these keys; in fact, keys do not carry any value at all. We can convert a computation in |KeyM| into a pure value by means of |runKeyM|, which requires the computation to be polymorphic in |s|, just like |runST| would.
+The Key Monad |KeyM| is basically a crippled version of the |ST|-monad: we can monadically create keys of type |Key s a| using the function |newKey|, but we cannot read or write values to these keys; in fact, keys do not carry any values at all. We can convert a computation in |KeyM| into a pure value by means of |runKeyM|, which requires the argument computation to be polymorphic in |s|, just like |runST| would.
 
-The only new feature is the function |testEquality|, which compares two keys for equality. But the keys do not have to be of the same type! They just have to come from the same |KeyM| computation, indicated by the |s| argument. If two keys are not equal, the answer is |Nothing|. However, if two keys are found to be equal, {\em then their types should also be the same}, and the answer is |Just Refl|, where |Refl| is a constructor from the GADT |a :~: b| that functions as the ``proof'' that |a| and |b| are in fact the same type\footnote{It is actually possible to add |testEquality| to the standard interface of |STRef|s, which would provide much the same features in the ST-monad as the Key Monad would, apart from some laziness issues. However, because of its simplicity, we think the Key Monad is interesting in its own right.}.
+The only new feature is the function |testEquality|, which compares two keys for equality. But the keys do not have to be of the same type! They just have to come from the same |KeyM| computation, indicated by the |s| argument. If two keys are not equal, the answer is |Nothing|. However, if two keys are found to be equal, {\em then their types should also be the same}, and the answer is |Just Refl|, where |Refl| is a constructor from the GADT |a :~: b| that functions as the ``proof'' that |a| and |b| are in fact the same type\footnote{It is actually possible to add |testEquality| to the standard interface of |STRef|s, which would provide much the same features in the ST monad as the Key Monad would, apart from some laziness issues. However, because of its simplicity, we think the Key Monad is interesting in its own right.}.
 
 Why is the Key Monad interesting? There are two separate reasons.
 
-First, decoupling the ability to combine different types into one computation from computations involving state, allows programmers to use the Key Monad in situations where the ST-monad would not have been suitable. In fact, the bulk of this paper presents examples of uses of the Key Monad that would have been impossible without |testEquality|.
+First, decoupling the ability to combine different types into one computation from computations involving state allows programmers to use the Key Monad in situations where the ST monad would not have been suitable. In fact, the bulk of this paper presents examples of uses of the Key Monad that would have been impossible without |testEquality|.
 
-Second, the Key Monad is simpler than the ST-monad, because it does not involve global references, or any updatable state at all. We would like to argue that therefore, the Key Monad is easier to understand than the ST-monad. Moreover, given the Key Monad, the ST-monad is actually implementable in plain Haskell, albeit less time and memory efficient than the original ST-monad (so missing feature (1) above, but still providing feature (2) and (3)).
+Second, the Key Monad is simpler than the ST monad, because it does not involve global references, or any updatable state at all. We would like to argue that therefore, the Key Monad is easier to understand than the ST monad. Moreover, given the Key Monad, the ST monad is actually implementable in plain Haskell, albeit in a less time- and memory-efficient way than the original ST monad (that is, missing feature (1) above, but still providing features (2) and (3)).
 The second reason comes with a possibly unexpected twist.
 
-After its introduction in 1994, several papers have claimed to establish the correctness, fully or partially, of the ST-monad in Haskell \cite{stmonad,LaunchburySabry,AriolaSabry,MoggiSabry}. By correctness we mean three things: (a) type safety (programs using the ST-monad are still type safe), (b) referential transparency (programs using the ST-monad are still referentially transparent), and (c) abstraction safety (programs using the ST-monad still obey the parametricity theorem). It came as a complete surprise to the authors that {\em none of the papers we came across in our literature study actually establishes the correctness of the ST-monad in Haskell!}
+After its introduction in 1994, several papers have claimed to establish the correctness, fully or partially, of the ST monad in Haskell \cite{stmonad,LaunchburySabry,AriolaSabry,MoggiSabry}. By correctness we mean three things: (a) type safety (programs using the ST monad are still type safe), (b) referential transparency (programs using the ST monad are still referentially transparent), and (c) abstraction safety (programs using the ST monad still obey the parametricity theorem). It came as a complete surprise to the authors that, to the best of our knowledge, {\em none of the papers we came across in our literature study actually establishes the correctness of the ST monad in Haskell!}
 
-So, there is a third reason for studying the Key Monad: A correctness proof for the Key Monad could be much simpler than a correctness proof for the ST-monad. The existence of such a proof would conceivably lead to a correctness proof of the ST-monad as well; in fact this is the route that we would currently recommend for anyone trying to prove the ST-monad correct.
+So, there is a third reason for studying the Key Monad: A correctness proof for the Key Monad could be much simpler than a correctness proof for the ST monad. The existence of such a proof would conceivably lead to a correctness proof of the ST monad as well; in fact this is the route that we would currently recommend for anyone trying to prove the ST monad correct.
 
-This paper does not provide a formal correctness proof of the Key Monad. Instead, we will argue that the correctness of the Key Monad is just as plausible as the correctness of the ST-monad. We hope that the reader will not hold it against us that we do not provide a correctness proof. Instead, we would like this paper to double as a call to arms, to find (ideally, mechanized) proofs of correctness of both the Key Monad and the ST-monad!
+This paper does not provide a formal correctness proof of the Key Monad. Instead, we will argue that the correctness of the Key Monad is just as plausible as the correctness of the ST monad. We hope that the reader will not hold it against us that we do not provide a correctness proof. Instead, we would like this paper to double as a call to arms, to find (ideally, mechanized) proofs of correctness of both the Key Monad and the ST monad!
 
 Our contributions are as follows:
 \begin{itemize}
@@ -116,7 +132,7 @@ We discuss the state of the proof of the safety of the |ST|-monad in section \re
 
 \atze{This sections needs work}
 
-The interface of the Key Monad (Fig.\ \ref{fig:key-monad}) features two abstract types (types of which the constructors are not available to the user): |Key| and |KeyM|. The Key Monad gives the user the power to create a new, unique value of type |Key s a| via |newKey|. The only operation that is supported on the type |Key| is |testEquality|, which checks if two given keys are the same, and if they are a ``proof'' is returned that the types assocatied with the names are the \emph{same} types. Such a  proof of the equality of type |a| and |b| is given as a value of the GADT |a :~: b|. The |KeyM| computation can be run with |runKeyM|, which requires that the type argument |s| is polymorphic, ensuring that |Key|s cannot escape the |KeyM| computation. 
+The interface of the Key Monad (Fig.\ \ref{fig:key-monad}) features two abstract types (i.e., with no user-accesible constructors): |Key| and |KeyM|. The Key Monad gives the user the power to create a new, unique value of type |Key s a| via |newKey|. The only operation that is supported on the type |Key| is |testEquality|, which checks if two given keys are the same, and if they are it returns a ``proof'' that the types associated with the names are the \emph{same} types. The witness to the equality of types |a| and |b| is given as a value of the GADT |a :~: b| constructed by the constructor |Refl|. Computations of type |KeyM| are made by using |newKey| and the usual Haskell monadic operators |return| and |(>>=)|. A |KeyM| computation can be run with |runKeyM|, which requires that the type argument |s| be polymorphic, ensuring that |Key|s cannot escape the scope of the |KeyM| computation where they were created. 
 
 \subsection{Unconstrained dynamic typing}
 
@@ -963,18 +979,18 @@ Second, we introduce two helper functions: |lam|, which takes a function over th
 
 Third, the fixpoint combinator takes a Haskell function |f|, wraps it onto the domain |D s a| resulting in a function |f'|, and then uses |lam| and |app| to construct a fixpoint combinator from the untyped lambda calculus. Lastly, we need to convert the result from the domain |D s a| back into Haskell-land using |unVal|.
 
-What this shows is that (1) adding the Key Monad to a terminating language may make it non-terminating, (2) the Key Monad is a genuine extension of Haskell without term-level recursion and type-level covariant recursion. Incidentally, this is also the case for the ST-monad.
+What this shows is that (1) adding the Key Monad to a terminating language may make it non-terminating, (2) the Key Monad is a genuine extension of Haskell without term-level recursion and type-level covariant recursion. Incidentally, this is also the case for the ST monad.
 
 
 \atze{From the discussion in 6.3 it follows that here we create the cyclic type |s ~ Single (D s a) :++: Empty|
 
-\section{Discussion on the ST-monad}
+\section{Discussion on the ST monad}
 \label{stdis}
-The ST-monad was introduced in \cite{stmonad} and contained some correctness statements and also a high-level description of a proof. The proof sketch mentions the use of parametricity, which is a doubtful proof technique to use because it is not established that parametricity still holds for a language with the ST-monad. A follow-up paper \cite{LaunchburySabry} mentions another problem with the first paper, in particular that implementations of the lazy ST-monad may actually generate the wrong result in a setting that is more eager. This paper claims to fix those issues with a new semantics and proof sketch. However, a bug in this correctness proof was discovered, which lead to a series of papers formalizing the treatment of different versions of encapsulating strict and lazy state threads in a functional language, culminating in \cite{MoggiSabry}. This paper gives different formulations of strict and lazy state threads, one of them corresponding to lazy state threads in Haskell. The aim of the paper is to establish {\em type safety} of state threads. However, the paper only provides a proof sketch of type safety for one of the formulations, and only claims type safety (without a proof) for the other ones.
+The ST monad was introduced in \cite{stmonad} and contained some correctness statements and also a high-level description of a proof. The proof sketch mentions the use of parametricity, which is a doubtful proof technique to use because it is not established that parametricity still holds for a language with the ST monad. A follow-up paper \cite{LaunchburySabry} mentions another problem with the first paper, in particular that implementations of the lazy ST monad may actually generate the wrong result in a setting that is more eager. This paper claims to fix those issues with a new semantics and proof sketch. However, a bug in this correctness proof was discovered, which lead to a series of papers formalizing the treatment of different versions of encapsulating strict and lazy state threads in a functional language, culminating in \cite{MoggiSabry}. This paper gives different formulations of strict and lazy state threads, one of them corresponding to lazy state threads in Haskell. The aim of the paper is to establish {\em type safety} of state threads. However, the paper only provides a proof sketch of type safety for one of the formulations, and only claims type safety (without a proof) for the other ones.
 
-Even if type safety may now be considered to have been established by these papers, we are still left with referential transparency and abstraction safety. Referential transparency is quite tricky for actual implementations of the ST-monad since efficient implementations use global pointers. Abstraction safety is also very important because most people assume that parametricity in Haskell actually holds, without giving it a second thought that the ST-monad may destroy it.
+Even if type safety may now be considered to have been established by these papers, we are still left with referential transparency and abstraction safety. Referential transparency is quite tricky for actual implementations of the ST monad since efficient implementations use global pointers. Abstraction safety is also very important because most people assume that parametricity in Haskell actually holds, without giving it a second thought that the ST monad may destroy it.
 
-Now, we actually believe that the ST-monad (and also the Key Monad) is correct in all of these senses. But we have also realized that there exist no actual proofs of these statements in the literature. We think that the Key Monad, which is arguably simpler than the ST-monad, could be a first step on the way to prove the ST-monad correct.
+Now, we actually believe that the ST monad (and also the Key Monad) is correct in all of these senses. But we have also realized that there exist no actual proofs of these statements in the literature. We think that the Key Monad, which is arguably simpler than the ST monad, could be a first step on the way to prove the ST monad correct.
 
 \section{Conclusion}
 
