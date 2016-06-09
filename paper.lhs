@@ -63,7 +63,7 @@
   obtain a proof that their types are equal. This gives us a form of
   dynamic typing, without the need for |Typeable| constraints. We
   show that this extension allows us to safely do things we could not
-  otherwise do, namely: implement the |ST| monad, implement an
+  otherwise do, namely: implement the \st{} monad, implement an
   embedded form of arrow notation in Haskell and translate
   parametric \hoas{} to typed de Bruijn indices, among others. Although strongly
   related to the \st{} monad, the Key monad is simpler and might be 
@@ -758,17 +758,13 @@ In this section, we precisely state what we mean by safety, and informally argue
 
 \subsection{Type safety}
 
-\pablo{I think we should define the term \emph{scope type variable};
-  as it stands it just looks like a typo since there is a standard
-  phrase 'scoped type variable' (for a different extension).}
-
-The first safety property that we conjecture the Key monad has is \emph{type safety}: |testEquality| will never allow us to prove that |a :~: b| if |a| and |b| are \emph{distinct} types. Informally, the justification for this is that a key value |k| of type |Key s a| together with its scope type variable |s| \emph{uniquely determine} the associated type |a| of the key. Hence, when two key values and scope type variables are the same\footnote{Even though users cannot compare keys explicitly, implementations of the |Key| monad internally represent keys by some underlying value that can be compared for equality.}, their associated types \emph{must be the same} as well. 
+The first safety property that we conjecture the Key monad has is \emph{type safety}: |testEquality| will never allow us to prove that |a :~: b| if |a| and |b| are \emph{distinct} types. Informally, the justification for this is that a key value |k| of type |Key s a| together with the type |s|, which we call the \emph{scope type variable},  \emph{uniquely determine} the associated type |a| of the key. Hence, when two key values and scope type variables are the same\footnote{Even though users cannot compare keys explicitly, implementations of the |Key| monad internally represent keys by some underlying value that can be compared for equality.}, their associated types \emph{must be the same} as well. 
 
 The argument why the scope type variable |s| and the key value |k| together uniquely determine type |a| goes as follows:
 \begin{enumerate}
 \item Each execution of a |Key| monad computation has a scope type variable |s| that is distinct from the scope type variables of all other |Key| monad computations. This is ensured by the type of |runKeyM|, namely |(forall s. KeyM s a) -> a|, which states that the type |s| cannot be unified with any other type. 
 \item Each |newKey| operation in such a |Key| monad computation gives a value that is unique within the scope determined by |s|, i.e. distinct from other keys created in the same computation.
-\item Each key only has \emph{a single type} associated with it. This is ensured by the type of |newKey|, which only allows us to construct a key with a single type, i.e. not a key of type |forall a. Key s a|, because the type of a potential function |createPolymorphicKey :: KeyM (forall a. Key s a)| would not unify with the type of |newKey|. 
+\item Each key only has \emph{a single type} associated with it. This is ensured by the type of |newKey|, which only allows us to construct a key with a single type, i.e. not a key of type |forall a. Key s a|, because the type of a hypothetical function |createPolymorphicKey :: KeyM (forall a. Key s a)| would not unify with the type of |newKey|. 
 \end{enumerate}
 
 
