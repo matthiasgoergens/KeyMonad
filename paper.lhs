@@ -258,13 +258,13 @@ For our implementation of the Key monad the following holds:
 
 \subsection{Relation to |Typeable|}
 
-The {\tt base} library |Data.Typeable| provides similar functionality to the Key monad. Typeable is a type class, which can only be derived, provides a value-level representation the types that implements it. In fact, since version 4.7, it provides a function:
+The {\tt base} library |Data.Typeable| provides similar functionality to the Key monad. Typeable is a type class, which can only be derived, provides a value-level representation of the types that implement it. In fact, since version 4.7, it provides a function:
 \begin{code}
 eqT :: forall a b. (Typeable a, Typeable b) => Maybe (a :~: b)
 \end{code}
-Where |(:~:)| is the \gadt{} as in Figure \ref{fig:key-monad}. This function gives |Just Refl| if both \emph{types} are the same, whereas |testEquality| from the Key monad gives just |Just Refl| if the \emph{keys} are the same. If we have two keys with the same type, but which originate from different |newKey| invocations, the result will be |Nothing|. 
+Where |(:~:)| is the \gadt{} as in Figure \ref{fig:key-monad}. This function gives |Just Refl| if both \emph{types} are the same, whereas |testEquality| from the Key monad gives just |Just Refl| if the \emph{keys} are the same. If we have two keys with the same type, but which originate from different |newKey| invocations, the result of |testEquality| will be |Nothing|. 
 
-Another difference is to obtain a key for a type |a|, we do not need a constraint on the type |a|, which we do need to get a value-level type representation using |Typeable|. These constraints can leak to the user level interface. For example, we can also implement a variant of the \st{} monad using typeable by giving each |STRef| a unique number and value-level representation of its type. However, we will then need to change the interface such that we have access to the value-level type representations, by adding |Typeable| constraints. For example, the type of |newSTRef| then becomes:
+Another difference is to obtain a key for a type |a|, we do not need a constraint on the type |a|, which we do need to get a value-level type representation using |Typeable|. These constraints can leak to the user level interface. For example, we can also implement a variant of the \st{} monad using typeable. Such an implementation stores in each |STRef| a unique number and value-level representation of its type. However, we will then need to change the interface such that we have access to the value-level type representations, by adding |Typeable| constraints. For example, the type of |newSTRef| then becomes:
 \begin{code}
 newSTRef :: Typeable a => a -> ST s (STRef s a)
 \end{code}
