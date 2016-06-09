@@ -32,6 +32,7 @@
 %format >- = "\succ"
 %format ~ = "\:\sim\:"
 %format :. = "\circ"
+%format :.. = "\circ\:"
 %format procb = "\mathbf{proc}"
 %format <$ = "\cmap"
 %format <*> = "\app"
@@ -97,12 +98,12 @@ data a :~: b where Refl :: a :~: a
 \end{figure}
 
 In this paper, we provide a new abstraction in Haskell that
-embodies only feature (3) above: the combination of references (which we call {\em keys}) of different, unconstrained types in the same computation. In the \st{} monad, the essential invariant that must hold for feature (3), is that when two references are the same, then their types must also be the same. Our new abstraction splits reasoning based on this invariant into a separate interface, and makes it available to user. The result is a small library called {\em the Key monad}. The \api{} is given in Fig.\ \ref{fig:key-monad}.
+embodies only feature (3) above: the combination of references (which we call {\em keys}) of different, unconstrained types in the same computation. In the \st{} monad, the essential invariant that must hold for feature (3), is that when two references are the same, then their types must also be the same. Our new abstraction splits reasoning based on this invariant into a separate interface, and makes it available to user. The result is a small library called {\em the Key monad}. The \api{} is given in Fig.\ \ref{fig:key-monad}. 
 
 The Key monad |KeyM| is basically a crippled version of the \st{} monad: we can monadically create keys of type |Key s a| using the function |newKey|, but we cannot read or write values to these keys; in fact, keys do not carry any values at all. We can convert a computation in |KeyM| into a pure value by means of |runKeyM|, which requires the argument computation to be polymorphic in |s|, just like |runST| would.
 
 
-The only new feature is the function |testEquality|, which compares two keys for equality. But the keys do not have to be of the same type! They just have to come from the same |KeyM| computation, indicated by the |s| argument. If two keys are not equal, the answer is |Nothing|. However, if two keys are found to be equal, {\em then their types must also be the same}, and the answer is |Just Refl|, where |Refl| is a constructor from the \gadt{} |a :~: b| that functions as the ``proof'' that |a| and |b| are in fact the same type\footnote{It is actually possible to add |testEquality| to the standard interface of |STRef|s, which would provide much the same features in the \st{} monad as the Key monad would, apart from some laziness issues. However, because of its simplicity, we think the Key monad is interesting in its own right.}. 
+The only new feature is the function |testEquality|, which compares two keys for equality. But the keys do not have to be of the same type! They just have to come from the same |KeyM| computation, indicated by the |s| argument. If two keys are not equal, the answer is |Nothing|. However, if two keys are found to be equal, {\em then their types must also be the same}, and the answer is |Just Refl|, where |Refl| is a constructor from the \gadt{} |a :~: b| that functions as the ``proof'' that |a| and |b| are in fact the same type\footnote{It is actually possible to add |testEquality| to the standard interface of |STRef|s, which would provide much the same features in the \st{} monad as the Key monad would, apart from some laziness issues. However, because of its simplicity, we think the Key monad is interesting in its own right.}. This gives us a form of dynamic typing, \emph{without} the need for |Typeable| constraints.
 
 
 
@@ -214,7 +215,7 @@ unpack ::  (forall s. ST s a) ->
 unpack (ST m) = m
 \end{code}
 
-\subsection{Implementing the Key monad with the \st{} monad}
+\subsection{Relation with the \st{} monad}
 
 Note that while the Key monad can be used to implement the \st{} monad, the converse is not true. The problem is that there is no function:
 \begin{code}
@@ -229,9 +230,21 @@ testEquality x y
 \end{code}
 The |unsafeCoerce| in |x == unsafeCoerce y| is needed because the types of the references might not be the same. Hence, another way to think of this paper is that we claim that the above function is \emph{safe}, that this allows us to do things which we could not do before, and that we propose this as an extension of the \st{} monad library. 
 
-Why is this function safe? The reason is that if two references are the same, then their types must also be the same. This invariant must already be true for \st{} references, because otherwise we could have two references pointing to the same location with different types. Writing to one references and then reading for the other would coerce the value from one type to another! Hence, yet another way of thinking of the Key monad is that it splits reasoning based on this invariant into a separate interface and makes it available to the user via |testEquality|.
+Note that with the above |testEquality| function for |STRef|s it is possible to implement something similar to Key monad, but the Key monad is more lazy. In particular, using the above implementation of |testEquality|, following holds for the (lazy) \st{} monad:
+\begin{code} 
+(runST $ undefined >> newSTRef 4 >>= 
+  \x -> return (testEquality x x)) == undefined
+\end{code}
+For the Key monad the following holds, as specified by the Key monad laws in Section \ref{laws}:
+\begin{code}
+(runKeyM $ undefined >> newKey >>=
+   \x -> return (testEquality x x)) == Just Refl
+\end{code}
 
-In the same line of reasoning, it is already possible to implement a similar, but weaker, version of |testEquality| using only the standard \st{} monad functions. If we represent keys of type |Key s a| as a pair of an identifier and an |STRef|s containing values of type |a|, then we can create a function that casts a value of type |a| to |b|, albeit monadically.
+Why is the |testEquality| function for |STRef|s safe? The reason is that if two references are the same, then their types must also be the same. This invariant must already be true for \st{} references, because otherwise we could have two references pointing to the same location with different types. Writing to one reference and then reading from the other would coerce the value from one type to another! Hence, the Key monad  splits reasoning based on this invariant into a separate interface and makes it available to the user via |testEquality|.
+
+
+In the same line of reasoning, it is already possible to implement a similar, but weaker, version of |testEquality| using only the standard \st{} monad functions. If we represent keys of type |Key s a| as a pair of an identifier and an |STRef|s containing values of type |a|, then we can create a function that casts a value of type |a| to |b|, albeit monadically, i.e. we get a monadic cast function |a -> ST s b| instead of a proof |a :~: b|:
 \begin{code}
 data Key s a = Key{  ident :: STRef s (),
                      ref   :: STRef s a }
@@ -249,20 +262,12 @@ testEqualityM ka kb
 \end{code} 
 This implementation, although a bit brittle because it relies on strong invariants, makes use of the insight that if the two references are actually the same reference, then writing to one reference must trigger a result in the other.
 
-Note that with this |testEquality| function for |STRef|s it is possible to implement the Key monad, but the our implementation of the Key monad is more lazy. In particular, using the above implementation of |testEquality|, following holds for the (lazy) \st{} monad:
-\begin{code} 
-(runST $ undefined >> newSTRef 4 >>= 
-  \x -> return (testEquality x x)) == undefined
-\end{code}
-For our implementation of the Key monad the following holds:
-\begin{code}
-(runKeyM $ undefined >> newKey >>=
-   \x -> return (testEquality x x)) == Just Refl
-\end{code}
+
+
 
 \subsection{Relation to |Typeable|}
 
-The {\tt base} library |Data.Typeable| provides similar functionality to the Key monad. Typeable is a type class that provides a value-level representation of the types that implement it. In fact, since version 4.7 of {\tt base}, it provides a function
+The {\tt base} library |Data.Typeable| provides similar functionality to the Key monad. Typeable is a type class that provides a value-level representation of the types that implement it. The |Typeable| library provides a function
 \begin{code}
 eqT :: forall a b. (Typeable a, Typeable b) => Maybe (a :~: b)
 \end{code}
@@ -272,11 +277,12 @@ Another difference is that with the Key monad, to obtain a key for a type |a|, w
 \begin{code}
 newSTRef :: Typeable a => a -> ST s (STRef s a)
 \end{code}
+
 In fact, all example usages of the Key monad in this paper can also be implemented by using |Typeable| and unique numbers and adding constraints to the user interface. We could even implement the Key monad itself by adding a |Typeable| constraint to |newKey|. However, using the Key monad has the benefit that it is \emph{unconstrained}: we can use it even when |Typeable| dictionaries are unavailable.
 
 \subsection{Key monad laws}
-
-Informally, the Key monad allows us to create new keys and compare them, maybe obtaining a proof of the equality of their associated types. To give a more precise specification and to allow equational reasoning, we also present the Key monad laws shown in Figure \ref{laws}, which we will now briefly discuss. The |sameKey| and |distinctKey| laws describe the behavior of |testEquality|.
+\label{laws}
+Informally, the Key monad allows us to create new keys and compare them, maybe obtaining a proof of the equality of their associated types. To give a more precise specification and to allow equational reasoning, we also present the Key monad laws shown in Figure \ref{laws}, which we will now briefly discuss. 
 
 \begin{figure}
 \hspace{-0.7cm}
@@ -328,6 +334,7 @@ do  y <- g
 \label{laws}
 \end{figure}
 
+The |sameKey| and |distinctKey| laws describe the behavior of |testEquality|.
 The |commutative| law states that the Key monad is a commutative monad: the order of actions does not matter. The |purity| law might be a bit surprising: it states that doing some Key computation and then throwing away the result is the same as not doing anything at all! The reason for this is that the only property of each key is that it is distinct from all other keys: making keys and then throwing them away has no (observable) effect on the rest of the computation.
 
 The last two laws, |runReturn| and |runF|,  state how we can get the values out of a |KeyM| computation with |runKey|. The |runF| law states that we can lazily get the results of a (potentially) infinite |KeyM| computation. The side condition that |m| has type |forall s. KeyM s a| (for some type |a|) rules out wrong specialization of the law, such as:  
@@ -525,14 +532,14 @@ proc f = runKeyM $
 
 \subsection{Discussion}
 
-Altenkirch, Chapman and Uustalu\cite{relmonad} show a related construction: that in category theory arrows are a special case of \emph{relative monads}, which are themselves a generalization of monads. A relative monad is an instance of the following type class:
+Altenkirch, Chapman and Uustalu\cite{relmonad} show a related construction: in category theory arrows are a special case of \emph{relative monads}, which are themselves a generalization of monads. A relative monad is an instance of the following type class:
 \begin{code}
 class RelativeM m v where
   rreturn  :: v x -> m x
   (.>>=)   :: m x -> (v x -> m y) -> m y
 \end{code}
 The only difference with regular monads is that the values resulting from computations must be wrapped in a type constructor |v|, instead of being ``bare''. The relative monad laws are also the same as the regular (Haskell) monad laws.
-The construction of Altenkirch et al. construction is not a relative monad in Haskell, only in category theory. In particular their definition uses the Yoneda embedding, which does not allow us freely use bound values, instead it requires us to manually lift values into scope, in the same fashion as directly using de Bruijn indices. 
+The construction of Altenkirch et al. construction is not a relative monad in Haskell, only in category theory. In particular their construction uses the Yoneda embedding, which does not allow us freely use bound values, instead it requires us to manually lift values into scope, in the same fashion as directly using de Bruijn indices. 
 
 Because all the operations in |ArrowSyn| (namely |(-<)|) return a |Cage|, it might be more informative to see it as a relative monad, i.e.:
 \begin{code}
@@ -567,7 +574,7 @@ toRm (Unpure m f)  = m .>>= (toRm :. f)
 \end{code}
 The insight is because a computation monad must eventually return a value of |v a| to convert a relative monad computation via |toRm|, any pure value that is used, can eventually be removed via the monad law |return x >>= f == f x|. Our embedded arrow construction can be seen as relative monad, where we apply this trick to obtain a monadic interface.
 
-Our construction hence suggests that arrows are also a special case of relative monad in Haskell with the key monad, but a formal proof (using the Key monad laws from Figure (\ref{laws}) is outside the scope of this paper. In the code online, we also show that this construction can be extended to use \emph{relative monadfix} (with function  |rmfix :: (v a -> m a) -> m a|) to construction arrows using |ArrowLoop|, but the we cannot use recursive monad notation in this case, because the above trick does not extend to Monadfix.
+Our construction hence suggests that arrows are also a special case of relative monad in Haskell with the key monad, but a formal proof (using the Key monad laws from Figure (\ref{laws})) is outside the scope of this paper. In the code online, we also show that this construction can be extended to use \emph{relative monadfix} (with function  |rmfix :: (v a -> m a) -> m a|) to construct arrows using |ArrowLoop|, but the we cannot use recursive monad notation in this case, because the above trick does not extend to Monadfix.
 
 
 The \emph{Arrow Calculus}\cite{arrowcalc} describes a translation of a form of arrow syntax (not embedded in Haskell) to arrows which is very similar to the construction presented here. Their calculus has five laws, three of which can be considered to be relative monad laws, which they use to prove the equational correspondence between their calculus and regular arrows. Due to the similarity, their paper should provide a good starting point for anyone trying to prove the same for this construction.
@@ -621,7 +628,7 @@ For instance, the lambda term |(\x y -> x)| can now be constructed with: |lam (\
 
 \subsection{Translating well-scoped representations}
 
-The datatype |KExp| does not ensure that any value of type |KExp| is well-scoped. As far as we know, there two are approaches to constructing data types for syntax which ensure that every value is well-scoped.  The first is parametric Higher Order Abstract Syntax (\hoas{})\cite{phoas, ags, graphs}, and the second is using typed de Bruijn indices\cite{nested}. However, there seems to be no way type-safe way to translate terms created with a parametric \hoas{} term to typed de Bruijn indices, but the Key monad allows us to cross this chasm.
+The datatype |KExp| does not ensure that any value of type |KExp| is well-scoped. As far as we know, there two are approaches to constructing data types for syntax which ensure that every value is well-scoped.  The first is parametric Higher Order Abstract Syntax (\hoas{})\cite{phoas, ags, graphs}, and the second is using typed de Bruijn indices\cite{nested}. However, there seems to be no way type-safe way to translate terms created with a parametric \hoas{} term to typed de Bruijn indices (without adding |Typeable| constraints to the |Phoas| datatype or using |unsafeCoerce|), but the Key monad allows us to cross this chasm.
  
 In parametric \hoas{}, typed lambda terms are represented by the following data type:
 \begin{code}
@@ -675,15 +682,15 @@ phoasToBruijn :: (forall v. Phoas v a) -> Bruijn [] a
 \end{code} 
 This seems to be not only be impossible in Haskell without extensions, but in dependently typed languages without extensions as well. When using |Phoas| in \emph{Coq} to prove properties about programming languages, an small extension to the logic in the form of a special well-scopedness axiom for the |Phoas| data type is needed to translate Phoas to de Bruijn indices\cite{phoas}.
 
-The well-scopedness of variables in a |Bruijn| value follows from the fact that the value is well-typed. With |Phoas|, the well-scopedness relies on the meta-level (i.e. not formalized through types) argument that no well-scoped values can be created by using the |Phoas| interface. The internal (i.e. formalized through types) well-scopedness of |Bruijn|, allows interpretations of syntax which seem to not be possible if we are using terms constructed with |Phoas|. As an example of this, consider translating lambda terms to \emph{Cartesian closed category} combinators (the categorical version of the lambda calculus). This can be done if the lambda terms are given as |Bruijn| values, as demonstrated in Figure \ref{ccc}. Without the Key monad, there seem to be no way to do the same for terms constructed with the Phoas terms.
+The well-scopedness of a |Bruijn| value follows from the fact that the value is well-typed. With |Phoas|, the well-scopedness relies on the meta-level (i.e. not formalized through types) argument that no well-scoped values can be created by using the |Phoas| interface. The internal (i.e. formalized through types) well-scopedness of |Bruijn|, allows interpretations of syntax which seem to not be possible if we are using terms constructed with |Phoas|. As an example of this, consider translating lambda terms to \emph{Cartesian closed category} combinators (the categorical version of the lambda calculus). This can be done if the lambda terms are given as |Bruijn| values, as demonstrated in Figure \ref{ccc}. Without the Key monad, there seem to be no way to do the same for terms constructed with the Phoas terms.
 
-Our implementation of |phoasToBruijn| works by first translating |Phoas| to the |KExp| from the previous subsection, and then translating that to typed de bruijn indices. The first step in this translation is straightforwardly defined using the |Hoas| interface from the previous subsection: 
+Our implementation of |phoasToBruijn| works by first translating |Phoas| to the |KExp| from the previous subsection, and then translating that to typed de Bruijn indices. The first step in this translation is straightforwardly defined using the |Hoas| interface from the previous subsection: 
 \begin{code}
 phoasToKey :: (forall v. Phoas v a) -> (forall s. KeyM s (KExp s a))
 phoasToKey v = getExp (go v) where
   go :: Phoas (HoasKey s) a -> HoasKey s a
   go (PVar v)    = v
-  go (PLam f)    = lam (go . f)
+  go (PLam f)    = lam (go :. f)
   go (PApp f x)  = app (go f) (go x)
 \end{code}
 
@@ -697,7 +704,7 @@ phoasToBruijn :: (forall v. Phoas v x) -> Bruijn [] x
 phoasToBruijn p = 
   runKeyM (keyToBruijn <$> phoasToKey p)
 \end{code}
-To implement the |keyToBruijn| function, we need a variant of the |Box| we saw previously:
+To implement the |keyToBruijn| function, we need a variant of the |Box| we saw in Section 2.1:
 \begin{code}
 data FBox s f where
   FLock :: Key s a -> f a -> FBox s f
@@ -723,7 +730,7 @@ lookup :: Key s a -> FKeyMap s f -> Maybe (f a)
 instance PFunctor (FKeyMap s)
 \end{code}
 
-We store the current ``environment'' as a |FKeyMap| mapping each |Key| to an |Index| in the current environment. When we enter a lambda-body, we need to extend the environment with a new name mapping to the de Bruijn index |Head|, and add one lookup step to each other de Bruijn index currently in the |FKeyMap|. This is be done as follows:
+To translate to de Bruijn indices, we store the current ``environment'' as a |FKeyMap| mapping each |Key| to an |Index| in the current environment. When we enter a lambda-body, we need to extend the environment: we add a mapping of the new variable to the de Bruijn index |Head|, and add one lookup step to each other de Bruijn index currently in the |FKeyMap|. This is be done as follows:
 \begin{code}
 extend :: Key s h -> FKeyMap s (Index t) ->
             FKeyMap s (Index (h : t))
@@ -756,8 +763,8 @@ toClosed p = go p TNil where
   go :: CCC c => Bruijn l y -> TList l (c x) -> c x y
   go (BVar x)    e = index e x
   go (BLam b)    e = 
-    curry $ go b (snd ::: HK (. fst) e)
-  go (BApp f x)  e = uncurry (go f e) . prod id (go x e)
+    curry $ go b (snd ::: pfmap (:.. fst) e)
+  go (BApp f x)  e = uncurry (go f e) :. prod id (go x e)
 
 instance PFunctor (TList l) where
   pfmap f TNil      = TNil
