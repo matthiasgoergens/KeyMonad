@@ -183,6 +183,8 @@ lookup k (Km (h : t))  =
 
 \subsection{Implementing the \st{} monad}
 
+\pablo{Note that |(!)| is not bound to anything.}
+
 Armed with our newly obtained |KeyMap|s, we can implement an (inefficient) version of the \st{} monad as follows. The implementation of |STRef|s is simply as an alias for |Key|s:
 \begin{code}
 type STRef s a = Key s a
@@ -428,13 +430,9 @@ enclosed in |Cage|s, a type which disallows observation of the value of type |x|
 
 \subsection{Implementing embedded arrow syntax}
 
-\pablo{I don't really like |liberate| here. It is linguistically
-  ill-typed because it is normally applied to
-  people or countries/regions/cities, not individual objects. I propose |open|.}
-
 The implementation of a |Cage| is as follows:
 \begin{code}
-newtype Cage s x = Cage { liberate :: KeyMap s -> x }
+newtype Cage s x = Cage { open :: KeyMap s -> x }
   deriving (Functor, Applicative)
 \end{code}
 Informally, a |Cage| ``contains'' a value of type |x|, but in reality
@@ -445,7 +443,7 @@ arrow computations returning a |Cage| do not allow pattern-matching on the resul
 % computation
 because the result is simply not available.
 
-In our construction, we use |Key|s as names, and and |KeyMap|s as
+In our construction, we use |Key|s as names, and |KeyMap|s as
 \emph{enviroments}, i.e. mappings from names to values.  Each result
 of an arrow via |(-<)| has its own name. A |Cage| stands for an
 expression, i.e. a function from environment to value, which may
@@ -496,7 +494,7 @@ introEnv k = arr (\v -> insert k v empty)
 We also define an arrow to eliminate an environment, by interpreting an expression (|Cage|) using that environment:
 \begin{code}
 elimEnv :: Arrow a => Cage s x -> a (KeyMap s) x
-elimEnv c = arr (liberate c)
+elimEnv c = arr (open c)
 \end{code}
 Next to introducing and eliminating environments, we also need to extend an environment and evaluate an expression while keeping the environment:
 \begin{code}
