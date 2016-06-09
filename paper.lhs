@@ -96,12 +96,15 @@ data a :~: b where Refl :: a :~: a
 \label{fig:key-monad}
 \end{figure}
 
-In this paper, we attempt to provide a new abstraction in Haskell that
-embodies only feature (3) above: the combination of references (which we call {\em keys}) of different, unconstrained types in the same computation. The result is a small library called {\em the Key monad}. The \api{} is given in Fig.\ \ref{fig:key-monad}.
+In this paper, we provide a new abstraction in Haskell that
+embodies only feature (3) above: the combination of references (which we call {\em keys}) of different, unconstrained types in the same computation. In the \st{} monad, the essential invariant that must hold for feature (3), is that when two references are the same, then their types must also be the same. Our new abstraction splits reasoning based on this invariant into a separate interface, and makes it available to user. The result is a small library called {\em the Key monad}. The \api{} is given in Fig.\ \ref{fig:key-monad}.
 
 The Key monad |KeyM| is basically a crippled version of the \st{} monad: we can monadically create keys of type |Key s a| using the function |newKey|, but we cannot read or write values to these keys; in fact, keys do not carry any values at all. We can convert a computation in |KeyM| into a pure value by means of |runKeyM|, which requires the argument computation to be polymorphic in |s|, just like |runST| would.
 
-The only new feature is the function |testEquality|, which compares two keys for equality. But the keys do not have to be of the same type! They just have to come from the same |KeyM| computation, indicated by the |s| argument. If two keys are not equal, the answer is |Nothing|. However, if two keys are found to be equal, {\em then their types should also be the same}, and the answer is |Just Refl|, where |Refl| is a constructor from the \gadt{} |a :~: b| that functions as the ``proof'' that |a| and |b| are in fact the same type\footnote{It is actually possible to add |testEquality| to the standard interface of |STRef|s, which would provide much the same features in the \st{} monad as the Key monad would, apart from some laziness issues. However, because of its simplicity, we think the Key monad is interesting in its own right.}.
+
+The only new feature is the function |testEquality|, which compares two keys for equality. But the keys do not have to be of the same type! They just have to come from the same |KeyM| computation, indicated by the |s| argument. If two keys are not equal, the answer is |Nothing|. However, if two keys are found to be equal, {\em then their types must also be the same}, and the answer is |Just Refl|, where |Refl| is a constructor from the \gadt{} |a :~: b| that functions as the ``proof'' that |a| and |b| are in fact the same type\footnote{It is actually possible to add |testEquality| to the standard interface of |STRef|s, which would provide much the same features in the \st{} monad as the Key monad would, apart from some laziness issues. However, because of its simplicity, we think the Key monad is interesting in its own right.}. 
+
+
 
 Why is the Key monad interesting? There are two separate reasons.
 
@@ -941,7 +944,7 @@ runKeyM $ (m >> newKey) >>= f
 \end{code}
 will get the name |Right (Left Start)|.
 
-A downside of this implementation is that |testEquality| is linear in the length of the tree paths. A more efficient implementation of the Key monad uses |Integer|s to represent keys, deals out unique names by unsafely reading and updating a mutable variable which is unsafely created in |runKey|. A full implementation of this version of the Key monad can be found in the code online.
+A downside of this implementation is that |testEquality| is linear in the length of the tree paths. A more efficient implementation of the Key monad uses |Integer|s to represent keys and deals out unique names by unsafely reading and updating a mutable variable which is unsafely created in |runKey|. A full implementation of this version of the Key monad can be found in the code online.
 
 \subsection{The key indexed monad}
 
@@ -1088,7 +1091,7 @@ Now, we actually believe that the \st{} monad (and also the Key monad) is safe i
 In the \st{} monad, one of the invariants that must hold is that when two references are the same, then their types must also be the same. We presented the Key monad, which splits reasoning based on this invariant into a separate interface, and makes it available to user. We showed that this new interface gives a form of dynamic typing without the need for |Typeable| constraints, which allows us to do things we could not do before: implement the \st{} monad, implement an embedded form of arrow syntax and translate parametric \hoas{} to typed de Bruijn indices. The Key monad is simpler than the \st{} monad, since it embodies just one aspect of it. A full proof of the safety of the \st{} monad remains elusive to this day, and a proof of the safety of the Key might be a stepping stone towards it.
 
 \paragraph{Acknowledgements}
-We thank Gershom Bazerman, Jonas Dureg{\aa}rd and John Hughes for helpful comments and insightful discussions.
+We thank Gershom Bazerman, Jonas Dure\-g{\aa}rd and John Hughes for helpful comments and insightful discussions.
 \label{conc}
 \bibliographystyle{apalike}
 \bibliography{refs}
