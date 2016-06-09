@@ -42,8 +42,9 @@
 %format EN = "E_n"
 %format uncurryn = "\mathit{uncurry}_n"
 \title{The Key Monad:\\Type-Safe Unconstrained Dynamic Typing}
-\authorinfo{Atze van der Ploeg, Koen Claessen, Pablo Buiras}{Chalmers University of Technology}
-           {\{atze, koen, buiras\}@@chalmers.se}
+\authorinfo{Atze van der Ploeg \and Koen Claessen}{Chalmers University of Technology}
+           {\{atze, koen\}@@chalmers.se}
+\authorinfo{Pablo Buiras}{Harvard University}{pbuiras@@seas.harvard.edu}
 \begin{document}
 \maketitle
 \newcommand{\api}{\textsc{api}}
@@ -67,10 +68,10 @@
   embedded form of arrow notation in Haskell and translate
   parametric \hoas{} to typed de Bruijn indices, among others. Although strongly
   related to the \st{} monad, the Key monad is simpler and might be 
-  easier to prove correct. We do not provide such a proof of the safety of the Key monad, but we note that, surprisingly, a full proof of the safety of
+  easier to prove safe. We do not provide such a proof of the safety of the Key monad, but we note that, surprisingly, a full proof of the safety of
   the \st{} monad remains elusive to this day. Hence, another reason for
-  studying the Key monad is that a correctness proof for it might
-  be a stepping stone towards a correctness proof of the \st{} monad as well.
+  studying the Key monad is that a safety proof for it might
+  be a stepping stone towards a safety proof of the \st{} monad as well.
 \end{abstract}
 
 
@@ -109,11 +110,11 @@ First, decoupling the ability to combine different types into one computation fr
 Second, the Key monad is simpler than the \st{} monad, because it does not involve global references, or any updatable state at all. We would like to argue that therefore, the Key monad is easier to understand than the \st{} monad. Moreover, given the Key monad, the \st{} monad is actually implementable in plain Haskell, albeit in a less time- and memory-efficient way than the original \st{} monad (that is, missing feature (1) above, but still providing features (2) and (3)).
 The second reason comes with a possibly unexpected twist.
 
-After its introduction in 1994, several papers have claimed to establish the correctness, fully or partially, of the \st{} monad in Haskell \cite{stmonad,LaunchburySabry,AriolaSabry,MoggiSabry}. By correctness we mean three things: (a) type safety (programs using the \st{} monad are still type safe), (b) referential transparency (programs using the \st{} monad are still referentially transparent), and (c) abstraction safety (programs using the \st{} monad still obey the parametricity theorem). It came as a complete surprise to the authors that, to the best of our knowledge, {\em none of the papers we came across in our literature study actually establishes the correctness of the \st{} monad in Haskell!}
+After its introduction in 1994, several papers have claimed to establish the safety, fully or partially, of the \st{} monad in Haskell \cite{stmonad,LaunchburySabry,AriolaSabry,MoggiSabry}. By safety we mean three things: (a) type safety (programs using the \st{} monad are still type safe), (b) referential transparency (programs using the \st{} monad are still referentially transparent), and (c) abstraction safety (programs using the \st{} monad still obey the parametricity theorem). It came as a complete surprise to the authors that {\em none of the papers we came across in our literature study actually establishes the safety of the \st{} monad in Haskell!}
 
-So, there is a third reason for studying the Key monad: A correctness proof for the Key monad could be much simpler than a correctness proof for the \st{} monad. The existence of such a proof would conceivably lead to a correctness proof of the \st{} monad as well; in fact this is the route that we would currently recommend for anyone trying to prove the \st{} monad correct.
+So, there is a third reason for studying the Key monad: A safety proof for the Key monad could be much simpler than a safety proof for the \st{} monad. The existence of such a proof would conceivably lead to a safety proof of the \st{} monad as well; in fact this is the route that we would currently recommend for anyone trying to prove the \st{} monad safe.
 
-This paper does not provide a formal correctness proof of the Key monad. Instead, we will argue that the correctness of the Key monad is just as plausible as the correctness of the \st{} monad. We hope that the reader will not hold it against us that we do not provide a correctness proof. Instead, we would like this paper to double as a call to arms, to find (ideally, mechanized) proofs of correctness of both the Key monad and the \st{} monad!
+This paper does not provide a formal safety proof of the Key monad. Instead, we will argue that the safety of the Key monad is just as plausible as the safety of the \st{} monad. We hope that the reader will not hold it against us that we do not provide a safety proof. Instead, we would like this paper to double as a call to arms, to find (ideally, mechanized) proofs of safety of both the Key monad and the \st{} monad!
 
 Our contributions are as follows:
 \begin{itemize}
@@ -1074,11 +1075,11 @@ For this reason, the type that is bound to |q| is \emph{the same type} for all v
 \section{Discussion on the \st{} monad proof}
 \label{stdis}
 
-The \st{} monad was introduced in \cite{stmonad} and contained some correctness statements and also a high-level description of a proof. The proof sketch mentions the use of parametricity, which is a doubtful proof technique to use because it is not established that parametricity still holds for a language with the \st{} monad. A follow-up paper \cite{LaunchburySabry} mentions another problem with the first paper, in particular that implementations of the lazy \st{} monad may actually generate the wrong result in a setting that is more eager. This paper claims to fix those issues with a new semantics and proof sketch. However, a bug in this correctness proof was discovered, which lead to a series of papers\cite{LaunchburySabry,AriolaSabry} formalizing the treatment of different versions of encapsulating strict and lazy state threads in a functional language, culminating in \cite{MoggiSabry}. This paper gives different formulations of strict and lazy state threads, one of them corresponding to lazy state threads in Haskell. The aim of the paper is to establish {\em type safety} of state threads. However, the paper only provides a proof sketch of type safety for one of the formulations, and only claims type safety (without a proof) for the other ones. With the exception of the original paper\cite{stmonad}, all these papers consider only \emph{local state}, that is, each state thread has its own memory, in contrast to the actual implementation of the \st{} monad.
+The \st{} monad was introduced in \cite{stmonad} and contained some safety statements and also a high-level description of a proof. The proof sketch mentions the use of parametricity, which is a doubtful proof technique to use because it is not established that parametricity still holds for a language with the \st{} monad. A follow-up paper \cite{LaunchburySabry} mentions another problem with the first paper, in particular that implementations of the lazy \st{} monad may actually generate the wrong result in a setting that is more eager. This paper claims to fix those issues with a new semantics and proof sketch. However, a bug in this safety proof was discovered, which lead to a series of papers\cite{LaunchburySabry,AriolaSabry} formalizing the treatment of different versions of encapsulating strict and lazy state threads in a functional language, culminating in \cite{MoggiSabry}. This paper gives different formulations of strict and lazy state threads, one of them corresponding to lazy state threads in Haskell. The aim of the paper is to establish {\em type safety} of state threads. However, the paper only provides a proof sketch of type safety for one of the formulations, and only claims type safety (without a proof) for the other ones. With the exception of the original paper\cite{stmonad}, all these papers consider only \emph{local state}, that is, each state thread has its own memory, in contrast to the actual implementation of the \st{} monad.
 
 Even if type safety may now be considered to have been established by these papers, we are still left with referential transparency and abstraction safety. We are unaware of any work that attempts to establish parametricity or referential transparency in the presence of the \st{} monad. Referential transparency is quite tricky for actual implementations of the \st{} monad since efficient implementations use global pointers. Abstraction safety is also very important because most people assume that parametricity in Haskell actually holds, without giving it a second thought that the \st{} monad may destroy it. 
 
-Now, we actually believe that the \st{} monad (and also the Key monad) is correct in all of these senses. But we have also realized that there exist no actual proofs of these statements in the literature. We think that the Key monad, which is arguably simpler than the \st{} monad, could be a first step on the way to prove the \st{} monad correct.
+Now, we actually believe that the \st{} monad (and also the Key monad) is safe in all of these senses. But we have also realized that there exist no actual proofs of these statements in the literature. We think that the Key monad, which is arguably simpler than the \st{} monad, could be a first step on the way to proving the \st{} monad safe.
 
 \section{Conclusion}
 
