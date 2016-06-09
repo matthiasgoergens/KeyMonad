@@ -59,6 +59,10 @@
 
 
 \begin{abstract}
+\pablo{To discuss: There are grammatical errors in this abstract that
+  I believe I have fixed but
+  were rolled back. The same mistakes occur in other places in the
+  paper when listing the things we could 'otherwise not do'.}
  We present a small extension to Haskell (+ \gadt s and rank-2 types) called the
   Key monad. With the Key monad, unique keys of different types can be
   created and can be tested for equality. When two keys are equal, we
@@ -366,9 +370,9 @@ In this section, we show that the Key monad gives us the power to implement an \
 
 \subsection{Arrows vs Monads}
 
-The |Arrow| type class, recalled in Figure \ref{arrowsdef}, was introduced by Hughes\cite{arrows} as an interface that is like monads, but which allows for more static information about the constructed computations to be extracted. However, in contrast to monads, arrows do not directly allow intermediate values to be \emph{named}, instead expressions must be written in \emph{point-free style}. 
+The |Arrow| type class, shown in Figure~\ref{arrowsdef}, was introduced by Hughes~\cite{arrows} as an interface that is like monads, but which allows for more static information about the constructed computations to be extracted. However, in contrast to monads, arrows do not directly allow intermediate values to be \emph{named}; instead, expressions must be written in \emph{point-free style}. 
 
-As an example, an arrow computation which feeds the same input to two arrows, and adds their outputs, can be expressed in point free style as follows:
+As an example, an arrow computation which feeds the same input to two arrows, and adds their outputs, can be expressed in point-free style as follows:
 \begin{code}
 addA :: Arrow a => a x Int -> a x Int -> a x Int
 addA f g =  arr (\x -> (x,x))  >>> first f >>> 
@@ -383,7 +387,7 @@ addM f g = \z ->
         y <- g z
         return (x + y)
 \end{code}
-To overcome this downside of arrows, Paterson introduced arrow notation\cite{arrownot}. In this notation, the above arrow computation can be written as follows:
+To overcome this downside of arrows, Paterson introduced arrow notation~\cite{arrownot}. In this notation, the above arrow computation can be written as follows:
 \begin{code}
 addA :: Arrow a => a b Int -> a b Int -> a b Int
 addA f g = procb z -> do
@@ -391,9 +395,11 @@ addA f g = procb z -> do
    y <- g -< z
    returnA -< x + y
 \end{code}
-Specialized compiler support is offered by the \ghc{}, which desugars this notation into point free expressions. 
+Specialized compiler support is offered by \ghc{}, which desugars this notation into point free expressions. 
 
-With the Key monad, we can name intermediate values in arrow computations using \emph{regular} monadic do notation, without relying on specialized compiler support. The same arrow computation can be expressed using our \emph{embedded} arrow notation as follows: 
+With the Key monad, we can name intermediate values in arrow
+computations using \emph{regular} monadic do notation, without relying
+on specialized compiler support. The |addA| computation above can be expressed using our \emph{embedded} arrow notation as follows: 
 \begin{code}
 addA :: Arrow a => a b Int -> a b Int -> a b Int
 addA f g = proc $ \z -> do
@@ -411,23 +417,40 @@ ifArrow t f = procb z -> do
      0 -> t -< z
      _ -> f -< z
 \end{code}
-Allowing this kind of behavior would make it impossible to translate arrow notation to arrow expression, because this is exactly the power that monads have but that arrows lack \cite{idiomarrmonad}. To mimic this restriction in our embedded arrow notation, our function |(-<)| has the following type:
+Allowing this kind of behavior would make it impossible to translate arrow notation to arrow expressions, because this is exactly the power that monads have but that arrows lack \cite{idiomarrmonad}. To mimic this restriction in our embedded arrow notation, our function |(-<)| has the following type:
 \begin{code}
 (-<) :: Arrow a => a x y -> Cage s x -> 
               ArrowSyn s (Cage s y)
 \end{code}
-Where |ArrowSyn| is the monad which we use to define our embedded arrow notation. The input and output of the arrow computations are enclosed in |Cage|s, a type which does not allow observation of the value of the type |x| it ``contains''. 
+The type |ArrowSyn| is the monad which we use to define our embedded
+arrow notation. The input and output of the arrow computations are
+enclosed in |Cage|s, a type which disallows observation of the value of type |x| it ``contains''. 
 
 \subsection{Implementing embedded arrow syntax}
+
+\pablo{I don't really like |liberate| here. It is linguistically
+  ill-typed because it is normally applied to
+  people or countries/regions/cities, not individual objects. I propose |open|.}
 
 The implementation of a |Cage| is as follows:
 \begin{code}
 newtype Cage s x = Cage { liberate :: KeyMap s -> x }
   deriving (Functor, Applicative)
 \end{code}
-Informally, a |Cage| ``contains'' a value of type |x|, but in reality it does not contain a value of type |x| at all: it is a function from a |KeyMap| to a value of type |x|. Hence we can we sure that we do not allow pattern matching on the result of an arrow computation, because the result is simply not available.
+Informally, a |Cage| ``contains'' a value of type |x|, but in reality
+it does not contain a value of type |x| at all: it is a function from
+a |KeyMap| to a value of type |x|. Hence we can be sure that
+arrow computations returning a |Cage| do not allow pattern-matching on the result,
+% we do not allow pattern matching on the result of an arrow
+% computation
+because the result is simply not available.
 
-In our construction, we use |Key|s as names, and and |KeyMap|s \emph{enviroments}, i.e. mappings of names to values.  Each result of an arrow via |(-<)| has its own name. A |Cage| is an expression, i.e. a function from environment to value, which may lookup names in the environment. The Key monad and the |KeyMap| allow us to model \emph{heterogeneous} environments which can be extended \emph{without changing} the \emph{type} of the environment. This is exactly the extra power we need to define this translation. 
+In our construction, we use |Key|s as names, and and |KeyMap|s as
+\emph{enviroments}, i.e. mappings from names to values.  Each result
+of an arrow via |(-<)| has its own name. A |Cage| stands for an
+expression, i.e. a function from environment to value, which may
+lookup names in the environment. As seen before, the Key monad in
+conjunction with |KeyMap|s allows us to model \emph{heterogeneous} environments which can be extended \emph{without changing} the \emph{type} of the environment, which is exactly the extra power we need to define this translation. 
 
 By using |(-<)| and the monad interface, we can construct the syntax for the arrow computation that we are expressing. Afterwards, we use the following function to convert the syntax to an arrow:
 \begin{code}
@@ -443,7 +466,7 @@ newtype ArrowSyn a s x =
        deriving (Functor,Applicative,Monad)
 type EnvArrow a s = EndoA a (KeyMap s)
 \end{code}
-Where |EndoA a x| is an arrow from a type |x| to the same type:
+The type |EndoA a x| is isomorphic to an arrow from a type |x| to the same type:
 \begin{code}
 newtype EndoA a x = EndoA (a x x)
 \end{code}
@@ -463,12 +486,12 @@ To define the operations |proc| and |(-<)|, we first define some auxiliary funct
 We can easily convert a name (|Key|) to the expression (|Cage|) which consists of looking up that name in the environment:
 \begin{code}
 toCage :: Key s a -> Cage s a
-toCage k = Cage (\env -> env ! k)
+toCage k = Cage (\env -> lookup k env)
 \end{code}
 We can introduce an environment from a single value, when given a name (|Key|) for that value: 
 \begin{code}
 introEnv :: Arrow a => Key s x -> a x (KeyMap s)
-introEnv k = arr (singleton k)
+introEnv k = arr (\v -> insert k v empty)
 \end{code}
 We also define an arrow to eliminate an environment, by interpreting an expression (|Cage|) using that environment:
 \begin{code}
@@ -487,7 +510,7 @@ withEnv c = dup >>> first (elimEnv c)
     where dup = arr (\x -> (x,x))
 \end{code}
 
-With these auxiliary arrows, we can define functions that convert back and forth between a regular arrow and a environment arrow. To implement |(-<)|, we need to convert an regular arrow to an environment arrow, for which we need an expression for the input to the arrow, and a name for the output of the arrow:
+With these auxiliary arrows, we can define functions that convert back and forth between a regular arrow and an environment arrow. To implement |(-<)|, we need to convert a regular arrow to an environment arrow, for which we need an expression for the input to the arrow, and a name for the output of the arrow:
 \begin{code}
 toEnvArrow ::  Arrow a =>  
            Cage s x  -> Key s y   -> 
@@ -497,7 +520,7 @@ toEnvArrow inC outK a  = EndoA $
 \end{code}
 We first produce the input to the argument arrow, by interpreting the input expression using the input environment. We then execute the argument arrow, and bind its output to the given name to obtain the output environment. 
 
-The |-<| operation get the arrow and the input expression as an argument, creates a name for the output, and then passes these three to |toEnvArrow|:
+The |-<| operation gets the arrow and the input expression as an argument, creates a name for the output, and then passes these three to |toEnvArrow|:
 \begin{code}
 (-<) :: Arrow a =>
         a x y ->
@@ -955,7 +978,7 @@ A downside of this implementation is that |testEquality| is linear in the length
 
 \subsection{The key indexed monad}
 
-Can we formalize through types the invariant that when to keys are the same value their types must also be the same? It turns out we can, but this adds more types to the interface, leading to a loss of power of the construction.
+Can we formalize through types the invariant that when two keys are the same their types must also be the same? It turns out we can, but this adds more types to the interface, leading to a loss of power of the construction.
 
 The crucial insight is that is needed for this implementation, is that it \emph{is} possible to implement to compare two indices in a heterogeneous list (Fig \ref{heteros}), and if they are equal, then produce a that the proof types are equal, as follows:
 \begin{code}
