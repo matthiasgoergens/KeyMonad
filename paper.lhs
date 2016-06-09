@@ -76,8 +76,6 @@
 
 \section{Introduction}
 
-\pablo{Why do we say 'ST monad' but 'Key Monad'? The capitalisation is inconsistent. I think we should go for 'Key monad' but I don't mind as long as we use the same for both. Also check that sometimes ST appears in italics.}
-
 The \st{} monad \cite{stmonad} in Haskell is an impressive feat of language design, but also a complicated beast. It provides and combines three separate features: (1) an abstraction for {\em global memory references} that can be efficiently written to and read from, (2) a mechanism for embedding computations involving these memory references in {\em pure computations}, and (3) a design that allows references in the same computation to be of {\em arbitrary, different types}, in a type-safe manner.
 
 \begin{figure}[t]
@@ -783,7 +781,7 @@ The second safety property that we are concerned with is \emph{referential trans
 let x = e in (x,x) ==  (e,e) 
 \end{code}
 
-In other words, referential transparency means that an expression always evaluates to the same result in any context. Our implementation of the key monad only relies on \emph{unsafeCoerce}; it does not use \emph{unsafePerformIO} and hence referential transparency cannot be broken by this implementation. \pablo{This is a little dodgy: unsafePerformIO can be implemented with just unsafeCoerce.} Since the |ST| monad can be implemented using the |Key| monad, the same can be said for the \st{} monad. 
+In other words, referential transparency means that an expression always evaluates to the same result in any context. Our implementation of the key monad only relies on \emph{unsafeCoerce}; it does not use \emph{unsafePerformIO}, nor does it use |unsafeCoerce| to convert an |IO a| action to a pure value and hence referential transparency cannot be broken by this implementation. Since the |ST| monad can be implemented using the |Key| monad, the same can be said for the \st{} monad. 
 However, more efficient implementations of the \st{} monad uses \emph{global} pointers respectively, which does rely on features that might potentially break referential transparency.
 
 
@@ -832,12 +830,12 @@ data Key A a where
 Here |A| is a globally unique type associated with the computation. This interpretation is a little tricky: since a |Key| computation might create an infinite number of keys, this hypothetical datatype might have an infinite number of constructors. Alternatively, we can interpret keys as \gadt s that index into a type-level list or type-level tree, as we do in Section \ref{impl}.  We conjecture that there is a variant of parametricity for Haskell extended with the Key monad in which, in analogy with parametricity for \gadt s, |boolBool| and |boolInt| above are considered to be indistinguishable. 
 
 
-\subsection{Termination}
-\pablo{Shall we rename this to Normalization?}
+\subsection{Normalization}
+
 A fourth desirable property of a type system extension is preservation of normalization, i.e.,
 the property that ensures well-typed terms always have a normal form. 
 %What this usually means is that type-safe programs that do not use recursion terminate.
-Although standard typed $\lambda$-calculi (such as System F) are normalizing, Haskell is not. Even without term-level recursion, we can create programs that do not terminate by using type-level recursion. However, if we disallow contravariant recursion at the type level (i.e.\ type-level recursive occurrences that occur to the left of a function arrow), then all Haskell programs without term-level recursion (and use of |undefined|) do terminate.
+Although standard typed $\lambda$-calculi (such as System F) are normalizing, Haskell is not, as we can write non-terminating programs. Even without term-level recursion, we can create programs that do not terminate by using type-level recursion. However, if we disallow contravariant recursion at the type level (i.e.\ type-level recursive occurrences that occur to the left of a function arrow), then all Haskell programs without term-level recursion (and use of |undefined|) do terminate.
 
 It turns out that extending a normalizing language with the |Key| monad breaks normalization.
 %, even when we disallow covariant recursion on the type level and recursion at the term level. 
@@ -874,7 +872,7 @@ Second, we introduce two helper functions: |lam|, which takes a function over th
 
 Third, the fixpoint combinator takes a Haskell function |f|, wraps it onto the domain |D s a| resulting in a function |f'|, and then uses |lam| and |app| to construct a fixpoint combinator from the untyped lambda calculus. Lastly, we need to convert the result from the domain |D s a| back into Haskell-land using |unVal|.
 
-What this shows is that (1) adding the Key monad to a terminating language may make it non-terminating, (2) the Key monad is a genuine extension of Haskell without term-level recursion and type-level contravariant recursion. Incidentally, this is also the case for the \st{} monad. In a stratified type system with universe levels, such as Agda or Coq, it should be possible to omit this problem by making keys of a higher level than their associated types.
+What this shows is that (1) adding the Key monad to a normalizing language may make it non-normalizing, (2) the Key monad is a genuine extension of Haskell without term-level recursion and type-level contravariant recursion. Incidentally, this is also the case for the \st{} monad. In a stratified type system with universe levels, such as Agda or Coq, it should be possible to omit this problem by making keys of a higher level than their associated types.
 
 \section{Implementing the Key monad}
 \label{impl}
