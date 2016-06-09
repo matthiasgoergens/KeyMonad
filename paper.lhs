@@ -42,8 +42,9 @@
 %format EN = "E_n"
 %format uncurryn = "\mathit{uncurry}_n"
 \title{The Key Monad:\\Type-Safe Unconstrained Dynamic Typing}
-\authorinfo{Atze van der Ploeg, Koen Claessen, Pablo Buiras}{Chalmers University of Technology}
-           {\{atze, koen, buiras\}@@chalmers.se}
+\authorinfo{Atze van der Ploeg \and Koen Claessen}{Chalmers University of Technology}
+           {\{atze, koen\}@@chalmers.se}
+\authorinfo{Pablo Buiras}{Harvard University}{pbuiras@@seas.harvard.edu}
 \begin{document}
 \maketitle
 \newcommand{\api}{\textsc{api}}
