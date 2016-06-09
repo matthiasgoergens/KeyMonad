@@ -614,7 +614,7 @@ data TExp a where
 \end{code}
 We cannot do much with this datatype. If we, for example, want to write an interpreter, then there is no way to represent the environment: we need to map names to values of different types, but there is no type-safe way to do so.
 
-With the Key monad, we \emph{can} extend this simple naming approach to typed representations, without adding |Typeable| constraints. Consider the following data type:
+We could add an extra argument to |Var| and |Lam| containing the type-representation, obtained using |Typeable|. With the Key monad, extend this simple naming approach to typed representations without adding |Typeable| constraints. Consider the following data type:
 \begin{code}
 data KExp s a where
   KVar  ::  Key s a -> KExp s a
@@ -964,6 +964,8 @@ runKeyM $ (m >> newKey) >>= f
 \end{code}
 will get the name |Right (Left Start)|.
 
+A downside of this implementation is that |testEquality| is linear in the length of the tree paths. A more efficient implementation of the Key monad uses |Integer|s to represent keys, deals out unique names by unsafely reading and updating a mutable variable which is unsafely created in |runKey|. A full implementation of this version of the Key monad can be found in the code online.
+
 \subsection{The key indexed monad}
 
 Can we formalize through types the invariant that when two keys are the same their types must also be the same? It turns out we can, but this adds more types to the interface, leading to a loss of power of the construction.
@@ -1108,6 +1110,8 @@ Now, we actually believe that the \st{} monad (and also the Key monad) is safe i
 
 In the \st{} monad, one of the invariants that must hold is that when two references are the same, then their types must also be the same. We presented the Key monad, which splits reasoning based on this invariant into a separate interface, and makes it available to user. We showed that this new interface gives a form of dynamic typing without the need for |Typeable| constraints, which allows us to do things we could not do before: implement the \st{} monad, implement an embedded form of arrow syntax and translate parametric \hoas{} to typed de Bruijn indices. The Key monad is simpler than the \st{} monad, since it embodies just one aspect of it. A full proof of the safety of the \st{} monad remains elusive to this day, and a proof of the safety of the Key might be a stepping stone towards it.
 
+\paragraph{Acknowledgements}
+We thank Gershom Bazerman, Jonas Dureg{\aa}rd and John Hughes for helpful comments and insightful discussions.
 \label{conc}
 \bibliographystyle{apalike}
 \bibliography{refs}
