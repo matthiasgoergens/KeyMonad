@@ -46,7 +46,11 @@
            {\{atze, koen, buiras\}@@chalmers.se}
 \begin{document}
 \maketitle
-
+\newcommand{\api}{\textsc{api}}
+\newcommand{\gadt}{\textsc{gadt}}
+\newcommand{\ghc}{\textsc{ghc}}
+\newcommand{\hoas}{\textsc{hoas}}
+\newcommand{\st}{\textsc{st}}
 \newcommand{\atze}[1]{{\it Atze says: #1}}
 \newcommand{\koen}[1]{{\it Koen says: #1}}
 \newcommand{\pablo}[1]{{\it Pablo says: #1}}
@@ -56,17 +60,17 @@
  We present a small extension to Haskell called the
   Key monad. With the Key monad, unique keys of different types can be
   created and can be tested for equality. When two keys are equal, we
-  obtain a proof that their types must also be equal, which gives us a form of
+  obtain a proof that their types are equal. This gives us a form of
   dynamic typing, without the need for |Typeable| constraints. We
   show that this extension allows us to safely do things we could not
   otherwise do, namely: implement the |ST| monad, implement an
   embedded form of arrow notation in Haskell and translate
-  parametric HOAS to typed de Bruijn indices, among others. Although strongly
-  related to the |ST| monad, the Key monad is simpler and might be 
+  parametric \hoas{} to typed de Bruijn indices, among others. Although strongly
+  related to the \st{} monad, the Key monad is simpler and might be 
   easier to prove correct. We do not provide such a proof of the safety of the Key monad, but we note that, surprisingly, a full proof of the safety of
-  the |ST| monad remains elusive to this day. Hence, another reason for
+  the \st{} monad remains elusive to this day. Hence, another reason for
   studying the Key monad is that a correctness proof for it might
-  be a stepping stone towards a correctness proof of the ST monad as well.
+  be a stepping stone towards a correctness proof of the \st{} monad as well.
 \end{abstract}
 
 
@@ -74,7 +78,7 @@
 
 \pablo{Why do we say 'ST monad' but 'Key Monad'? The capitalisation is inconsistent. I think we should go for 'Key monad' but I don't mind as long as we use the same for both. Also check that sometimes ST appears in italics.}
 
-The |ST| monad \cite{stmonad} in Haskell is an impressive feat of language design, but also a complicated beast. It provides and combines three separate features: (1) an abstraction for {\em global memory references} that can be efficiently written to and read from, (2) a mechanism for embedding computations involving these memory references in {\em pure computations}, and (3) a design that allows references in the same computation to be of {\em arbitrary, different types}, in a type-safe manner.
+The \st{} monad \cite{stmonad} in Haskell is an impressive feat of language design, but also a complicated beast. It provides and combines three separate features: (1) an abstraction for {\em global memory references} that can be efficiently written to and read from, (2) a mechanism for embedding computations involving these memory references in {\em pure computations}, and (3) a design that allows references in the same computation to be of {\em arbitrary, different types}, in a type-safe manner.
 
 \begin{figure}[t]
 \rule{\columnwidth}{0.4pt}
@@ -94,48 +98,48 @@ data a :~: b where Refl :: a :~: a
 \end{figure}
 
 In this paper, we attempt to provide a new abstraction in Haskell that
-embodies only feature (3) above: the combination of references (which we call {\em keys}) of different, unconstrained types in the same computation. The result is a small library called {\em the Key Monad}. The API is given in Fig.\ \ref{fig:key-monad}.
+embodies only feature (3) above: the combination of references (which we call {\em keys}) of different, unconstrained types in the same computation. The result is a small library called {\em the Key monad}. The \api{} is given in Fig.\ \ref{fig:key-monad}.
 
-The Key Monad |KeyM| is basically a crippled version of the |ST| monad: we can monadically create keys of type |Key s a| using the function |newKey|, but we cannot read or write values to these keys; in fact, keys do not carry any values at all. We can convert a computation in |KeyM| into a pure value by means of |runKeyM|, which requires the argument computation to be polymorphic in |s|, just like |runST| would.
+The Key monad |KeyM| is basically a crippled version of the \st{} monad: we can monadically create keys of type |Key s a| using the function |newKey|, but we cannot read or write values to these keys; in fact, keys do not carry any values at all. We can convert a computation in |KeyM| into a pure value by means of |runKeyM|, which requires the argument computation to be polymorphic in |s|, just like |runST| would.
 
-The only new feature is the function |testEquality|, which compares two keys for equality. But the keys do not have to be of the same type! They just have to come from the same |KeyM| computation, indicated by the |s| argument. If two keys are not equal, the answer is |Nothing|. However, if two keys are found to be equal, {\em then their types should also be the same}, and the answer is |Just Refl|, where |Refl| is a constructor from the GADT |a :~: b| that functions as the ``proof'' that |a| and |b| are in fact the same type\footnote{It is actually possible to add |testEquality| to the standard interface of |STRef|s, which would provide much the same features in the ST monad as the Key Monad would, apart from some laziness issues. However, because of its simplicity, we think the Key Monad is interesting in its own right.}.
+The only new feature is the function |testEquality|, which compares two keys for equality. But the keys do not have to be of the same type! They just have to come from the same |KeyM| computation, indicated by the |s| argument. If two keys are not equal, the answer is |Nothing|. However, if two keys are found to be equal, {\em then their types should also be the same}, and the answer is |Just Refl|, where |Refl| is a constructor from the \gadt{} |a :~: b| that functions as the ``proof'' that |a| and |b| are in fact the same type\footnote{It is actually possible to add |testEquality| to the standard interface of |STRef|s, which would provide much the same features in the \st{} monad as the Key monad would, apart from some laziness issues. However, because of its simplicity, we think the Key monad is interesting in its own right.}.
 
-Why is the Key Monad interesting? There are two separate reasons.
+Why is the Key monad interesting? There are two separate reasons.
 
-First, decoupling the ability to combine different types into one computation from computations involving state allows programmers to use the Key Monad in situations where the ST monad would not have been suitable. In fact, the bulk of this paper presents examples of uses of the Key Monad that would have been impossible without |testEquality|.
+First, decoupling the ability to combine different types into one computation from computations involving state allows programmers to use the Key monad in situations where the \st{} monad would not have been suitable. In fact, the bulk of this paper presents examples of uses of the Key monad that would have been impossible without |testEquality|.
 
-Second, the Key Monad is simpler than the ST monad, because it does not involve global references, or any updatable state at all. We would like to argue that therefore, the Key Monad is easier to understand than the ST monad. Moreover, given the Key Monad, the ST monad is actually implementable in plain Haskell, albeit in a less time- and memory-efficient way than the original ST monad (that is, missing feature (1) above, but still providing features (2) and (3)).
+Second, the Key monad is simpler than the \st{} monad, because it does not involve global references, or any updatable state at all. We would like to argue that therefore, the Key monad is easier to understand than the \st{} monad. Moreover, given the Key monad, the \st{} monad is actually implementable in plain Haskell, albeit in a less time- and memory-efficient way than the original \st{} monad (that is, missing feature (1) above, but still providing features (2) and (3)).
 The second reason comes with a possibly unexpected twist.
 
-After its introduction in 1994, several papers have claimed to establish the correctness, fully or partially, of the ST monad in Haskell \cite{stmonad,LaunchburySabry,AriolaSabry,MoggiSabry}. By correctness we mean three things: (a) type safety (programs using the ST monad are still type safe), (b) referential transparency (programs using the ST monad are still referentially transparent), and (c) abstraction safety (programs using the ST monad still obey the parametricity theorem). It came as a complete surprise to the authors that, to the best of our knowledge, {\em none of the papers we came across in our literature study actually establishes the correctness of the ST monad in Haskell!}
+After its introduction in 1994, several papers have claimed to establish the correctness, fully or partially, of the \st{} monad in Haskell \cite{stmonad,LaunchburySabry,AriolaSabry,MoggiSabry}. By correctness we mean three things: (a) type safety (programs using the \st{} monad are still type safe), (b) referential transparency (programs using the \st{} monad are still referentially transparent), and (c) abstraction safety (programs using the \st{} monad still obey the parametricity theorem). It came as a complete surprise to the authors that, to the best of our knowledge, {\em none of the papers we came across in our literature study actually establishes the correctness of the \st{} monad in Haskell!}
 
-So, there is a third reason for studying the Key Monad: A correctness proof for the Key Monad could be much simpler than a correctness proof for the ST monad. The existence of such a proof would conceivably lead to a correctness proof of the ST monad as well; in fact this is the route that we would currently recommend for anyone trying to prove the ST monad correct.
+So, there is a third reason for studying the Key monad: A correctness proof for the Key monad could be much simpler than a correctness proof for the \st{} monad. The existence of such a proof would conceivably lead to a correctness proof of the \st{} monad as well; in fact this is the route that we would currently recommend for anyone trying to prove the \st{} monad correct.
 
-This paper does not provide a formal correctness proof of the Key Monad. Instead, we will argue that the correctness of the Key Monad is just as plausible as the correctness of the ST monad. We hope that the reader will not hold it against us that we do not provide a correctness proof. Instead, we would like this paper to double as a call to arms, to find (ideally, mechanized) proofs of correctness of both the Key Monad and the ST monad!
+This paper does not provide a formal correctness proof of the Key monad. Instead, we will argue that the correctness of the Key monad is just as plausible as the correctness of the \st{} monad. We hope that the reader will not hold it against us that we do not provide a correctness proof. Instead, we would like this paper to double as a call to arms, to find (ideally, mechanized) proofs of correctness of both the Key monad and the \st{} monad!
 
 Our contributions are as follows:
 \begin{itemize}
 \item We present the Key monad (Section \ref{keym}) and argue for its safety (Section \ref{safety}).
 \item We show that added power of the Key monad allows us to do things we cannot do without it, namely:
      \begin{itemize}
-          \item Implement the |ST| monad (Section \ref{keym}).
+          \item Implement the \st{} monad (Section \ref{keym}).
           \item Implement an \emph{embedded} form of arrow notation (Section \ref{arrow}).
           \item Represent typed variables in typed representations of syntax (Section \ref{syntax}).
-          \item Translate parametric Hoas to nested de Bruijn indices, which allows interpretations of parametric Hoas terms, such translation to Cartesian closed categories, which are not possible otherwise (Section \ref{syntax}).
+          \item Translate parametric \hoas{} to nested de Bruijn indices, which allows interpretations of parametric \hoas{} terms, such translation to Cartesian closed categories, which are not possible otherwise (Section \ref{syntax}).
 \end{itemize}
 \item We present an argument why the Key monad is not expressible in Haskell (without |unsafeCoerce|) (Section \ref{impl}).
 \end{itemize}
-We discuss the state of the proof of the safety of the |ST| monad in section \ref{stdis} and we conclude in Section \ref{conc}.
+We discuss the state of the proof of the safety of the \st{} monad in section \ref{stdis} and we conclude in Section \ref{conc}.
 
 The Haskell code discussed in this paper can be found online at: 
 \url{https://github.com/koengit/KeyMonad}
 
-\section{The Key Monad}
+\section{The Key monad}
 \label{keym}
 
-In this section, we describe the |Key| monad, what it gives us, and its relation to the |ST| monad.
+In this section, we describe the Key monad, what it gives us, and its relation to the \st{} monad.
 
-The interface of the Key Monad (Fig.\ \ref{fig:key-monad}) features two abstract types (i.e., types with no user-accessible constructors): |Key| and |KeyM|. The Key Monad gives the user the power to create a new, unique value of type |Key s a| via |newKey|. The only operation that is supported on the type |Key| is |testEquality|, which checks if two given keys are the same, and if they are it returns a ``proof'' that the types associated with the names are the \emph{same} types. 
+The interface of the Key monad (Fig.\ \ref{fig:key-monad}) features two abstract types (i.e., types with no user-accessible constructors): |Key| and |KeyM|. The Key monad gives the user the power to create a new, unique value of type |Key s a| via |newKey|. The only operation that is supported on the type |Key| is |testEquality|, which checks if two given keys are the same, and if they are it returns a ``proof'' that the types associated with the names are the \emph{same} types. 
 
 \subsection{Unconstrained dynamic typing}
 
@@ -170,9 +174,9 @@ lookup k (Km (h : t))  =
 
 \end{code}
 
-\subsection{Implementing the |ST| monad}
+\subsection{Implementing the \st{} monad}
 
-Armed with our newly obtained |KeyMap|s, we can implement an (inefficient) version of the |ST| monad as follows. The implementation of |STRef|s is simply as an alias for |Key|s:
+Armed with our newly obtained |KeyMap|s, we can implement an (inefficient) version of the \st{} monad as follows. The implementation of |STRef|s is simply as an alias for |Key|s:
 \begin{code}
 type STRef s a = Key s a
 \end{code}
@@ -198,7 +202,7 @@ writeSTRef k v = ST $ modify (insert k v)
 
 
 \end{code}
-Finally, the implementation of |runST| simply runs the monadic computation contained in the |ST| type:
+Finally, the implementation of |runST| simply runs the monadic computation contained in the \st{} type:
 \begin{code}
 runST :: (forall s. ST s a) -> a
 runST m = runKeyM (evalStateT (unpack m) empty)
@@ -208,9 +212,9 @@ unpack ::  (forall s. ST s a) ->
 unpack (ST m) = m
 \end{code}
 
-\subsection{Implementing the |Key| monad with the |ST| monad}
+\subsection{Implementing the |Key| monad with the \st{} monad}
 
-Note that while the |Key| monad can be used to implement the |ST| monad, the reverse is not true. The problem is that there is no function:
+Note that while the |Key| monad can be used to implement the \st{} monad, the converse is not true. The problem is that there is no function:
 \begin{code}
 testEquality ::  STRef s a -> STRef s b -> 
                  Maybe (a :~: b)
@@ -221,11 +225,11 @@ testEquality x y
    | x == unsafeCoerce y  = Just (unsafeCoerce Refl)
    | otherwise            = Nothing
 \end{code}
-The |unsafeCoerce| in |x == unsafeCoerce y| is needed because the types of the references might not be the same. Hence, another way to think of this paper is that we claim that the above function is \emph{safe}, that this allows us to do things which we could not do before, and that we propose this as an extension of the |ST| monad library. 
+The |unsafeCoerce| in |x == unsafeCoerce y| is needed because the types of the references might not be the same. Hence, another way to think of this paper is that we claim that the above function is \emph{safe}, that this allows us to do things which we could not do before, and that we propose this as an extension of the \st{} monad library. 
 
-Why is this function safe? The reason is that if two references are the same, then their types must also be the same. This invariant must already be true for |ST| references, because otherwise we could have two references pointing to the same location with different types. Writing to one references and then reading for the other would coerce the value from one type to another! Hence, yet another way of thinking of the Key monad is that it splits reasoning based on this invariant into a separate interface and makes it available to the user via |testEquality|.
+Why is this function safe? The reason is that if two references are the same, then their types must also be the same. This invariant must already be true for \st{} references, because otherwise we could have two references pointing to the same location with different types. Writing to one references and then reading for the other would coerce the value from one type to another! Hence, yet another way of thinking of the Key monad is that it splits reasoning based on this invariant into a separate interface and makes it available to the user via |testEquality|.
 
-In the same line of reasoning, it is already possible to implement a similar, but weaker, version of |testEquality| using only the standard |ST| monad functions. If we represent keys of type |Key s a| as a pair of an identifier and an |STRef|s containing values of type |a|, then we can create a function that casts a value of type |a| to |b|, albeit monadically.
+In the same line of reasoning, it is already possible to implement a similar, but weaker, version of |testEquality| using only the standard \st{} monad functions. If we represent keys of type |Key s a| as a pair of an identifier and an |STRef|s containing values of type |a|, then we can create a function that casts a value of type |a| to |b|, albeit monadically.
 \begin{code}
 data Key s a = Key{  ident :: STRef s (),
                      ref   :: STRef s a }
@@ -243,7 +247,7 @@ testEqualityM ka kb
 \end{code} 
 This implementation, although a bit brittle because it relies on strong invariants, makes use of the insight that if the two references are actually the same reference, then writing to one reference must trigger a result in the other.
 
-Note that with this |testEquality| function for |STRef|s it is possible to implement the |Key| monad, but the our implementation of the |Key| monad is more lazy. In particular, using the above implementation of |testEquality|, following holds for the (lazy) ST monad:
+Note that with this |testEquality| function for |STRef|s it is possible to implement the |Key| monad, but the our implementation of the |Key| monad is more lazy. In particular, using the above implementation of |testEquality|, following holds for the (lazy) \st{} monad:
 \begin{code} 
 (runST $ undefined >> newSTRef 4 >>= 
   \x -> return (testEquality x x)) == undefined
@@ -364,7 +368,7 @@ addA f g = procb z -> do
    y <- g -< z
    returnA -< x + y
 \end{code}
-Specialized compiler support is offered by the GHC, which desugars this notation into point free expressions. 
+Specialized compiler support is offered by the \ghc{}, which desugars this notation into point free expressions. 
 
 With the Key monad, we can name intermediate values in arrow computations using \emph{regular} monadic do notation, without relying on specialized compiler support. The same arrow computation can be expressed using our \emph{embedded} arrow notation as follows: 
 \begin{code}
@@ -565,7 +569,7 @@ data Exp   =  Var Name
            |  Lam Name Exp
            |  App Exp Exp
 \end{code}
-If we want to represent a \emph{typed} representation of the lambda calculus, then this approach does not work anymore. Consider the following GADT:
+If we want to represent a \emph{typed} representation of the lambda calculus, then this approach does not work anymore. Consider the following \gadt{}:
 \begin{code}
 data TExp a where
   Var  :: Name -> TExp a
@@ -581,7 +585,7 @@ data KExp s a where
   KLam  ::  Key s a -> KExp s b -> KExp s (a -> b)
   KApp  ::  KExp s (a -> b) -> KExp s a -> KExp s b
 \end{code}
-Because the names are now represented as keys, we can represented an environment as a |KeyMap|. We can even offer a Higher Order Abstract (HOAS) \cite{hoas} interface for constructing such terms by threading the key monad computation, which guarantees that all terms constructed with this interface are well-scoped:
+Because the names are now represented as keys, we can represented an environment as a |KeyMap|. We can even offer a Higher Order Abstract Syntax (\hoas{}) \cite{hoas} interface for constructing such terms by threading the key monad computation, which guarantees that all terms constructed with this interface are well-scoped:
 \begin{code}
 class Hoas f where 
   lam :: (f a -> f b)  -> f (a -> b)
@@ -601,9 +605,9 @@ For instance, the lambda term |(\x y -> x)| can now be constructed with: |lam (\
 
 \subsection{Translating well-scoped representations}
 
-The datatype |KExp| does not ensure that any value of type |KExp| is well-scoped. As far as we know, there two are approaches to constructing data types for syntax which ensure that every value is well-scoped.  The first is Parametric Higher Order Abstract Syntax (HOAS)\cite{phoas, ags, graphs}, and the second is using typed de Bruijn indices\cite{nested}. However, there seems to be no way type-safe way to translate terms created with a PHoas term to typed de Bruijn indices, but the Key monad allows us to cross this chasm.
+The datatype |KExp| does not ensure that any value of type |KExp| is well-scoped. As far as we know, there two are approaches to constructing data types for syntax which ensure that every value is well-scoped.  The first is parametric Higher Order Abstract Syntax (\hoas{})\cite{phoas, ags, graphs}, and the second is using typed de Bruijn indices\cite{nested}. However, there seems to be no way type-safe way to translate terms created with a parametric \hoas{} term to typed de Bruijn indices, but the Key monad allows us to cross this chasm.
  
-In Parametric HOAS, typed lambda terms are represented by the following data type:
+In parametric \hoas{}, typed lambda terms are represented by the following data type:
 \begin{code}
 data Phoas v a where
   PVar  :: v a -> Phoas v a
@@ -616,9 +620,9 @@ For example, the lambda term |(\x y -> x)| can be constructed as follows:
 phoasExample :: Phoas v (x -> y -> x)
 phoasExample = PLam (\x -> PLam (\y -> x))
 \end{code}
-An attractive property of Parametric HOAS is that we use Haskell binding to construct syntax, and that terms of type |(forall v. Phoas v a)| are always well-scoped\cite{phoas}.
+An attractive property of parametric \hoas{} is that we use Haskell binding to construct syntax, and that terms of type |(forall v. Phoas v a)| are always well-scoped\cite{phoas}.
 
-The second way to ensure well-scopedness is to use typed de Bruijn indices. We present our own modern variant of this technique using Data Kinds and GADTs, but the idea is essentially the same as presented by Bird and Paterson \cite{nested}. Our representation of typed de Bruijn indices is an index in a heterogeneous list (Figure \ref{heteros}). A typed de Bruijn index of type |Index l a| is an index for a variable of type |a| in an environment where the types of the variables are represented by the type level list |l|. We can use these indices to represent lambda terms as follows:
+The second way to ensure well-scopedness is to use typed de Bruijn indices. We present our own modern variant of this technique using Data Kinds and \gadt s, but the idea is essentially the same as presented by Bird and Paterson \cite{nested}. Our representation of typed de Bruijn indices is an index in a heterogeneous list (Figure \ref{heteros}). A typed de Bruijn index of type |Index l a| is an index for a variable of type |a| in an environment where the types of the variables are represented by the type level list |l|. We can use these indices to represent lambda terms as follows:
 \begin{code}
 data Bruijn l a where
   BVar  :: Index l a -> Bruijn l a
@@ -779,8 +783,8 @@ The second safety property that we are concerned with is \emph{referential trans
 let x = e in (x,x) ==  (e,e) 
 \end{code}
 
-In other words, referential transparency means that an expression always evaluates to the same result in any context. Our implementation of the key monad only relies on \emph{unsafeCoerce}; it does not use \emph{unsafePerformIO} and hence referential transparency cannot be broken by this implementation. \pablo{This is a little dodgy: unsafePerformIO can be implemented with just unsafeCoerce.} Since the |ST| monad can be implemented using the |Key| monad, the same can be said for the |ST| monad. 
-However, more efficient implementations of the |ST| monad uses \emph{global} pointers respectively, which does rely on features that might potentially break referential transparency.
+In other words, referential transparency means that an expression always evaluates to the same result in any context. Our implementation of the key monad only relies on \emph{unsafeCoerce}; it does not use \emph{unsafePerformIO} and hence referential transparency cannot be broken by this implementation. \pablo{This is a little dodgy: unsafePerformIO can be implemented with just unsafeCoerce.} Since the |ST| monad can be implemented using the |Key| monad, the same can be said for the \st{} monad. 
+However, more efficient implementations of the \st{} monad uses \emph{global} pointers respectively, which does rely on features that might potentially break referential transparency.
 
 
 \subsection{Abstraction safety} 
@@ -818,14 +822,14 @@ testEquality IsChar  IsChar  = Just Refl
 testEquality _       _       = Nothing
 \end{code}
 
-There are, however, formulations of parametricity which state more precisely exactly which abstraction barrier cannot be crossed \cite{type-safecast, bernardy_proofs_2012}. In these formulations, |boolBool| and |boolInt| are indistinguishable. We can think of |runKeyM| as an operation which dreams up a specific |Key| GADT for the given computation, for example:
+There are, however, formulations of parametricity which state more precisely exactly which abstraction barrier cannot be crossed \cite{type-safecast, bernardy_proofs_2012}. In these formulations, |boolBool| and |boolInt| are indistinguishable. We can think of |runKeyM| as an operation which dreams up a specific |Key| \gadt{} for the given computation, for example:
 \begin{code}
 data Key A a where
   Key0 :: Key A Int
   Key1 :: Key A Bool
   ...
 \end{code}
-Here |A| is a globally unique type associated with the computation. This interpretation is a little tricky: since a |Key| computation might create an infinite number of keys, this hypothetical datatype might have an infinite number of constructors. Alternatively, we can interpret keys as GADTs that index into a type-level list or type-level tree, as we do in Section \ref{impl}.  We conjecture that there is a variant of parametricity for Haskell extended with the Key monad in which, in analogy with parametricity for GADTs, |boolBool| and |boolInt| above are considered to be indistinguishable. 
+Here |A| is a globally unique type associated with the computation. This interpretation is a little tricky: since a |Key| computation might create an infinite number of keys, this hypothetical datatype might have an infinite number of constructors. Alternatively, we can interpret keys as \gadt s that index into a type-level list or type-level tree, as we do in Section \ref{impl}.  We conjecture that there is a variant of parametricity for Haskell extended with the Key monad in which, in analogy with parametricity for \gadt s, |boolBool| and |boolInt| above are considered to be indistinguishable. 
 
 
 \subsection{Termination}
@@ -870,11 +874,11 @@ Second, we introduce two helper functions: |lam|, which takes a function over th
 
 Third, the fixpoint combinator takes a Haskell function |f|, wraps it onto the domain |D s a| resulting in a function |f'|, and then uses |lam| and |app| to construct a fixpoint combinator from the untyped lambda calculus. Lastly, we need to convert the result from the domain |D s a| back into Haskell-land using |unVal|.
 
-What this shows is that (1) adding the Key Monad to a terminating language may make it non-terminating, (2) the Key Monad is a genuine extension of Haskell without term-level recursion and type-level contravariant recursion. Incidentally, this is also the case for the ST monad. In a stratified type system with universe levels, such as Agda or Coq, it should be possible to omit this problem by making keys of a higher level than their associated types.
+What this shows is that (1) adding the Key monad to a terminating language may make it non-terminating, (2) the Key monad is a genuine extension of Haskell without term-level recursion and type-level contravariant recursion. Incidentally, this is also the case for the \st{} monad. In a stratified type system with universe levels, such as Agda or Coq, it should be possible to omit this problem by making keys of a higher level than their associated types.
 
 \section{Implementing the Key monad}
 \label{impl}
-Is the |Key| monad expressible in Haskell directly, without using |unsafeCoerce|? Can we employ more recent advancements such as \emph{GADT}s to ``prove'' to the type system that the |Key| monad is safe? In this section, we argue and motivate that the answer to this question is most likely ``no'' by exploring how far we can get. 
+Is the |Key| monad expressible in Haskell directly, without using |unsafeCoerce|? Can we employ more recent advancements such as  \gadt s to ``prove'' to the type system that the |Key| monad is safe? In this section, we argue and motivate that the answer to this question is most likely ``no'' by exploring how far we can get. 
 
 \subsection{Implementation using |unsafeCoerce|}
 
@@ -1014,7 +1018,7 @@ This interface is an instance of the \emph{parametric effect monad} type class\c
 
 Note that in the implementation |runKeyIm| now uses the universally quantified type variable to |s| to unifiy |s| with |l|, to use |newTNameSupply|. This ``closes the context'', stating that the context is precisely the types which are created in the computation. In contrast, in |runKeyM| the type variable was not given an interpretation.
 
-While we have succeeded in avoiding |unsafeCoerce|, this construction is \emph{less powerful} than the regular key monad because the types of the keys which are going to be created must now be \emph{statically known}. All example use cases of the key monad in this paper rely on the fact that the type of the keys which are going to be created do not have to be statically know. For example, we cannot implement a translation from parametric Hoas to de Bruijn indices with |KeyIm|, because the type of the keys which will have to be created is precisely the information that a parametric HOAS representation lacks.
+While we have succeeded in avoiding |unsafeCoerce|, this construction is \emph{less powerful} than the regular key monad because the types of the keys which are going to be created must now be \emph{statically known}. All example use cases of the key monad in this paper rely on the fact that the type of the keys which are going to be created do not have to be statically know. For example, we cannot implement a translation from parametric \hoas{} to de Bruijn indices with |KeyIm|, because the type of the keys which will have to be created is precisely the information that a parametric \hoas{} representation lacks.
 
 \subsection{Attempting to recover the |Key| monad}
 
@@ -1023,7 +1027,7 @@ Can we formalize the invariant through types and provide the regular |Key| monad
 data KeyM s a where
   KeyM :: KeyIm s p a -> KeyM s a
 \end{code}
-We denote this type by |exists p. KeyIm s p a| for presentational purposes, which is not valid (GHC) Haskell. While this allows us to provide type-safe implementations of |testEquality|, |fmap|, |newKey| and |return|, things go awry for |join| (or |>>=|) and |runKeyM|.
+We denote this type by |exists p. KeyIm s p a| for presentational purposes, which is not valid (\ghc{}) Haskell. While this allows us to provide type-safe implementations of |testEquality|, |fmap|, |newKey| and |return|, things go awry for |join| (or |>>=|) and |runKeyM|.
 
 The first problem arises at |runKeyM|. We get the type:
 \begin{code}
@@ -1059,18 +1063,18 @@ Again, these two types are \emph{not} equivalent: the latter implies the former,
 For this reason, the type that is bound to |q| is \emph{the same type} for all values of |TNameSupply p s|. Hence, it should be safe to coerce the argument from the former type to the later type. However, formalizing this through types seems unlikely. One could try formalizing the abstractness of the name supply by making the implementation polymorphic in the implementation of the name supply and names. One would then also need to formalize the exact behavior of the name supply, for example that the name supply acts in exactly the same way as the implementation with paths in trees. This property, cannot be encoded in the Haskell type system (yet), since it requires the types to constraint the exact behavior of functions in the implementation, which requires dependent typing.  Moreover, as far as we know it is already impossible to prove the following simpler property (which holds by parametricity) in Haskell: |(forall f. f x -> exists q. g q) -> (forall f. exists q. f x -> g q)|. Finally, when a computation creates an infinite number of keys, this will also lead to an \emph{infinite} type, which is not allowed in the Haskell type system. For these reasons, we feel that it is highly unlikely that the |Key| monad can be expressed in pure Haskell.
 
 
-\section{Discussion on the ST monad proof}
+\section{Discussion on the \st{} monad proof}
 \label{stdis}
 
-The ST monad was introduced in \cite{stmonad} and contained some correctness statements and also a high-level description of a proof. The proof sketch mentions the use of parametricity, which is a doubtful proof technique to use because it is not established that parametricity still holds for a language with the ST monad. A follow-up paper \cite{LaunchburySabry} mentions another problem with the first paper, in particular that implementations of the lazy ST monad may actually generate the wrong result in a setting that is more eager. This paper claims to fix those issues with a new semantics and proof sketch. However, a bug in this correctness proof was discovered, which lead to a series of papers\cite{LaunchburySabry,AriolaSabry} formalizing the treatment of different versions of encapsulating strict and lazy state threads in a functional language, culminating in \cite{MoggiSabry}. This paper gives different formulations of strict and lazy state threads, one of them corresponding to lazy state threads in Haskell. The aim of the paper is to establish {\em type safety} of state threads. However, the paper only provides a proof sketch of type safety for one of the formulations, and only claims type safety (without a proof) for the other ones. With the exception of the original paper\cite{stmonad}, all these papers consider only \emph{local state}, that is, each state thread has its own memory, in contrast to the actual implementation of the |ST| monad.
+The \st{} monad was introduced in \cite{stmonad} and contained some correctness statements and also a high-level description of a proof. The proof sketch mentions the use of parametricity, which is a doubtful proof technique to use because it is not established that parametricity still holds for a language with the \st{} monad. A follow-up paper \cite{LaunchburySabry} mentions another problem with the first paper, in particular that implementations of the lazy \st{} monad may actually generate the wrong result in a setting that is more eager. This paper claims to fix those issues with a new semantics and proof sketch. However, a bug in this correctness proof was discovered, which lead to a series of papers\cite{LaunchburySabry,AriolaSabry} formalizing the treatment of different versions of encapsulating strict and lazy state threads in a functional language, culminating in \cite{MoggiSabry}. This paper gives different formulations of strict and lazy state threads, one of them corresponding to lazy state threads in Haskell. The aim of the paper is to establish {\em type safety} of state threads. However, the paper only provides a proof sketch of type safety for one of the formulations, and only claims type safety (without a proof) for the other ones. With the exception of the original paper\cite{stmonad}, all these papers consider only \emph{local state}, that is, each state thread has its own memory, in contrast to the actual implementation of the \st{} monad.
 
-Even if type safety may now be considered to have been established by these papers, we are still left with referential transparency and abstraction safety. We are unaware of any work that attempts to establish parametricity or referential transparency in the presence of the |ST| monad. Referential transparency is quite tricky for actual implementations of the ST monad since efficient implementations use global pointers. Abstraction safety is also very important because most people assume that parametricity in Haskell actually holds, without giving it a second thought that the ST monad may destroy it. 
+Even if type safety may now be considered to have been established by these papers, we are still left with referential transparency and abstraction safety. We are unaware of any work that attempts to establish parametricity or referential transparency in the presence of the \st{} monad. Referential transparency is quite tricky for actual implementations of the \st{} monad since efficient implementations use global pointers. Abstraction safety is also very important because most people assume that parametricity in Haskell actually holds, without giving it a second thought that the \st{} monad may destroy it. 
 
-Now, we actually believe that the ST monad (and also the Key Monad) is correct in all of these senses. But we have also realized that there exist no actual proofs of these statements in the literature. We think that the Key Monad, which is arguably simpler than the ST monad, could be a first step on the way to prove the ST monad correct.
+Now, we actually believe that the \st{} monad (and also the Key monad) is correct in all of these senses. But we have also realized that there exist no actual proofs of these statements in the literature. We think that the Key monad, which is arguably simpler than the \st{} monad, could be a first step on the way to prove the \st{} monad correct.
 
 \section{Conclusion}
 
-In the ST monad, one of the invariants that must hold is that when two references are the same, then their types must also be the same. We presented the Key monad, which splits reasoning based on this invariant into a separate interface, and makes it available to user. We showed that this new interface gives a form of dynamic typing without the need for |Typeable| constraints, which allows us to do things we could not do before: implement the ST monad, implement an embedded form of arrow syntax and translate parametric Hoas to typed de Bruijn indices. The Key monad is simpler than the ST monad, since it embodies just one aspect of it. A full proof of the safety of the ST monad remains elusive to this day, and a proof of the safety of the Key might be a stepping stone towards it.
+In the \st{} monad, one of the invariants that must hold is that when two references are the same, then their types must also be the same. We presented the Key monad, which splits reasoning based on this invariant into a separate interface, and makes it available to user. We showed that this new interface gives a form of dynamic typing without the need for |Typeable| constraints, which allows us to do things we could not do before: implement the \st{} monad, implement an embedded form of arrow syntax and translate parametric \hoas{} to typed de Bruijn indices. The Key monad is simpler than the \st{} monad, since it embodies just one aspect of it. A full proof of the safety of the \st{} monad remains elusive to this day, and a proof of the safety of the Key might be a stepping stone towards it.
 
 \label{conc}
 \bibliographystyle{apalike}
