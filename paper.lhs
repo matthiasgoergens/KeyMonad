@@ -444,7 +444,7 @@ arrow computations returning a |Cage| do not allow pattern-matching on the resul
 because the result is simply not available.
 
 In our construction, we use |Key|s as names, and |KeyMap|s as
-\emph{enviroments}, i.e. mappings from names to values.  Each result
+\emph{environments}, i.e. mappings from names to values.  Each result
 of an arrow via |(-<)| has its own name. A |Cage| stands for an
 expression, i.e. a function from environment to value, which may
 lookup names in the environment. As seen before, the Key monad in
