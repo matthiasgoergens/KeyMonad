@@ -209,8 +209,6 @@ readSTRef r = ST $ (getr) <$> get
 
 writeSTRef :: STRef s a -> a -> ST s ()
 writeSTRef k v = ST $ modify (insert k v)
-
-
 \end{code}
 Finally, the implementation of |runST| simply runs the monadic computation contained in the \st{} type:
 \begin{code}
