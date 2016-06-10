@@ -922,7 +922,7 @@ What this shows is that (1) adding the Key monad to a normalizing language may m
 
 \section{Implementing the Key monad}
 \label{impl}
-Is the Key monad expressible in Haskell directly, without using |unsafeCoerce|? Can we employ more recent advancements such as  \gadt s to ``prove'' to the type system that the Key monad is safe? In this section, we argue and motivate that the answer to this question is most likely ``no'' by exploring how far we can get. 
+Is the Key monad expressible in Haskell directly, without using |unsafeCoerce|? Can we employ more recent advancements such as  \gadt s to ``prove'' to the type system that the Key monad is safe? In this section, we explore how far we can get (and fail).
 
 \subsection{Implementation using |unsafeCoerce|}
 
@@ -980,7 +980,7 @@ Note that the Key monad laws from Figure \ref{laws} only hold for this implement
 
 A downside of this implementation is that |testEquality| is linear in the length of the tree paths. A more efficient implementation of the Key monad uses |Integer|s to represent keys and deals out unique names by unsafely reading and updating a mutable variable which is unsafely created in |runKey|. A full implementation of this version of the Key monad can be found in the code online.
 
-\subsection{The key indexed monad}
+\subsection{The Key indexed monad}
 
 Can we formalize through types the invariant that when two keys are the same their types must also be the same? It turns out we can, but this adds more types to the interface, leading to a loss of power of the construction.
 
@@ -1070,7 +1070,9 @@ While we have succeeded in avoiding |unsafeCoerce|, this construction is \emph{l
 
 \subsection{Attempting to recover the Key monad}
 
-Can we formalize the invariant through types and provide the regular Key monad interface? An obvious attempt at this is hiding the extra type of |KeyIM|:
+Can we formalize the invariant through types and provide the regular Key monad interface? We believe not.
+
+An obvious attempt at this is hiding the extra type of |KeyIM|:
 \begin{code}
 data KeyM s a where
   KeyM :: KeyIM s p a -> KeyM s a
