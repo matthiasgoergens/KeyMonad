@@ -421,7 +421,7 @@ ifArrow t f = procb z -> do
 Allowing this kind of behavior would make it impossible to translate arrow notation to arrow expressions, because this is exactly the power that monads have but that arrows lack \cite{idiomarrmonad}. To mimic this restriction in our embedded arrow notation, our function |(-<)| has the following type:
 \begin{code}
 (-<) :: Arrow a => a x y -> Cage s x -> 
-              ArrowSyntax s (Cage s y)
+              ArrowSyntax a s (Cage s y)
 \end{code}
 The type |ArrowSyntax| is the monad which we use to define our embedded
 arrow notation. The input and output of the arrow computations are
@@ -440,7 +440,7 @@ a |KeyMap| to a value of type |x|. Hence we can be sure that
 arrow computations returning a |Cage| do not allow pattern-matching on the result,
 % we do not allow pattern matching on the result of an arrow
 % computation
-because the result is simply not available. In the usage of |Applicative| we saw earlier in the expression |(+) <$> x <*> y|, was using the |Applicative| instance of |Cage|s. 
+because the result is simply not available. In the usage of |Applicative| in the expression |(+) <$> x <*> y|  we saw earlier, uses the |Applicative| instance of |Cage|s. 
 
 In our construction, we use |Key|s as names, and |KeyMap|s as
 \emph{environments}, i.e. mappings from names to values.  Each result
