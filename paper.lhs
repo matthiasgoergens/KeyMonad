@@ -142,7 +142,7 @@ We discuss the state of the proof of the safety of the \st{} monad in section \r
 
 In this section, we describe the Key monad, what it gives us, and its relation to the \st{} monad.
 
-The interface of the Key monad (Fig.\ \ref{fig:key-monad}) features two abstract types (i.e., types with no user-accessible constructors): |Key| and |KeyM|. The Key monad gives the user the power to create a new, unique value of type |Key s a| via |newKey|. The only operation that is supported on the type |Key| is |testEquality|, which checks if two given keys are the same, and if they are it returns a ``proof'' that the types associated with the names are the \emph{same} types. 
+The interface of the Key monad (Fig.\ \ref{fig:key-monad}) features two abstract types (i.e., types with no user-accessible constructors): |Key| and |KeyM|. The Key monad gives the user the power to create a new, unique value of type |Key s a| via |newKey|. The only operation that is supported on the type |Key| is |testEquality|, which checks if two given keys are the same, and if they are returns a ``proof'' that the types associated with the names are the same types. 
 
 \subsection{Unconstrained dynamic typing}
 
