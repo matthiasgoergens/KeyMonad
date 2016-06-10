@@ -249,13 +249,13 @@ For the Key monad the following holds, as specified by the Key monad laws in Sec
 Why is the |testEquality| function for |STRef|s safe? The reason is that if two references are the same, then their types must also be the same. This invariant must already be true for \st{} references, because otherwise we could have two references pointing to the same location with different types. Writing to one reference and then reading from the other would coerce the value from one type to another! Hence, the Key monad  splits reasoning based on this invariant into a separate interface and makes it available to the user via |testEquality|.
 
 
-In the same line of reasoning, it is already possible to implement a similar, but weaker, version of |testEquality| using only the standard \st{} monad functions. If we represent keys of type |Key s a| as a pair of an identifier and an |STRef|s containing values of type |a|, then we can create a function that casts a value of type |a| to |b|, albeit monadically, i.e. we get a monadic cast function |a -> ST s b| instead of a proof |a :~: b|:
+In the same line of reasoning, it is already possible to implement a similar, but weaker, version of |testEquality| using only the standard \st{} monad functions. If we represent keys of type |Key s a| as a pair of an identifier and an |STRef| containing values of type |a|, then we can create a function that casts a value of type |a| to |b|, albeit monadically, i.e. we get a monadic cast function |a -> ST s b| instead of a proof |a :~: b|:
 \begin{code}
 data Key s a = Key{  ident :: STRef s (),
                      ref   :: STRef s a }
 
 newKey :: ST s (Key s a)
-newKey = Key <$> newSTRef undefined <*> newSTRef undefined
+newKey = Key <$> newSTRef () <*> newSTRef undefined
 
 testEqualityM ::  Key s a -> Key s b -> 
                   Maybe (a -> ST s b)
