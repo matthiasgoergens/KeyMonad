@@ -902,9 +902,9 @@ app k (Fun f) x = f (Lock k x)
 fix :: (a -> a) -> a
 fix f = runKeyM $
    do  k <- newKey
-       let f'    = lam k (Val . f . unVal)
-           xfxx  = lam k (\x -> app k f' (app k x x))
-           fixf  = app k xfxx xfxx
+       let  f'    = lam k (Val . f . unVal)
+            xfxx  = lam k (\x -> app k f' (app k x x))
+            fixf  = app k xfxx xfxx
        return (unVal fixf)
  where unVal (Val x) = x
 \end{code}
@@ -1087,11 +1087,11 @@ runKeyM :: (exists p. forall s. KeyIM s p a) -> a
 \end{code}
 These types are \emph{not} equivalent: the latter implies the former, but not the other way around. In the former, the type which is bound to |p| may depend on |s|, which cannot happen in the latter. 
 
-If the types of all keys which are created do not mention |s|, we do not for example create a key of type |Key s (Key s a)|, then one could argue that coercing the computation from the former to the latter is perfectly safe. However, if we create a key of type |Key s (Key s Int)|, then when the type |s| is unified with the tree of types of the keys, this leads to \emph{cyclic} types. For example:
+Let us take a look at what happens if we allow this coercion and |p| does depend on |s|, for example when we create a key of type |Key s (Key s Int)|. When the type |s| is now unified with the tree of types of the keys, it leads to \emph{cyclic} types:
 \begin{code}
 s ~ (Key s Int) :++: t
 \end{code} 
-In the previous section, we demonstrated that allowing such keys, where the type of the key mentions |s|, allows us to write |fix| without recursion. Apart from that, it seems that these particular cyclic types does not do any harm (we already had nontermination in Haskell), and it is likely to be safe to coerce the first type of |runKeyM| to the latter. However, it is highly unlikely that we can formalize through types that this coercion is safe: the Haskell type system does not allow cyclic types. Even if it did, it is unclear to us how to prove that this coercion is safe.
+In the previous section, we demonstrated that allowing such keys, where the type of the key mentions |s|, allows us to write |fix| without recursion. In the worst case, allowing such cyclic types may lead to type unsoundness.
 
 For |join| other problems arise. We need a implementation of type:
 \begin{code}
