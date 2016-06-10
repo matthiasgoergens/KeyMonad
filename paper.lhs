@@ -881,7 +881,7 @@ Here |A| is a globally unique type associated with the computation. This interpr
 A fourth desirable property of a type system extension is preservation of normalization, i.e.,
 the property that ensures well-typed terms always have a normal form. 
 %What this usually means is that type-safe programs that do not use recursion terminate.
-Although standard typed $\lambda$-calculi (such as System F) are normalizing, Haskell is not, as we can write non-terminating programs. Even without term-level recursion, we can create programs that do not terminate by using type-level recursion. However, if we disallow contravariant recursion at the type level (i.e.\ type-level recursive occurrences that occur to the left of a function arrow), then all Haskell programs without term-level recursion (and use of |undefined|) do terminate.
+Although standard typed $\lambda$-calculi (such as System F) are normalizing, Haskell is not, as we can write non-terminating programs. Even without term-level recursion, we can create programs that do not terminate by using type-level recursion. However, if we disallow contravariant recursion at the type level (i.e.\ type-level recursive occurrences that occur to the left of a function arrow), then all Haskell programs without term-level recursion do terminate.
 
 It turns out that extending a normalizing language with the Key monad breaks normalization.
 %, even when we disallow contravariant recursion on the type level and recursion at the term level. 
