@@ -651,7 +651,7 @@ Note that we only need the Key monad to {\em create} keys. Once we have created 
 
 \subsection{Translating well-scoped representations}
 
-The datatype |KExp| does not ensure that any value of type |KExp| is well-scoped. There are two well-known approaches to constructing data types for syntax which ensure that every value is well-scoped.  The first is parametric Higher Order Abstract Syntax (\hoas{})\cite{phoas, ags, graphs}, and the second is using typed de Bruijn indices\cite{nested}.
+The datatype |KExp| does not ensure that any value of type |KExp| is well-scoped. There are two well-known approaches to constructing data types for syntax which ensure that every value is well-scoped.  The first is parametric Higher Order Abstract Syntax (\hoas{}) \cite{phoas, ags, graphs}, and the second is using typed de Bruijn indices \cite{nested}.
 
 Interestingly, there seems to be no type-safe way to translate parametric \hoas{} terms to terms with typed de Bruijn indices (without adding |Typeable| constraints to the |Phoas| datatype or using |unsafeCoerce|). The Key monad does allow us to cross this chasm.
 
@@ -670,7 +670,7 @@ phoasExample = PLam (\x -> PLam (\y -> x))
 \end{code}
 An attractive property of parametric \hoas{} is that we use Haskell binding to construct syntax, and that terms of type |(forall v. Phoas v a)| are always well-scoped \cite{phoas}.
 
-The second way to ensure well-scopedness is to use typed de Bruijn indices. We present our own modern variant of this technique using Data Kinds and \gadt s, but the idea is essentially the same as presented by Bird and Paterson \cite{nested}. Our representation of typed de Bruijn indices is an index in a heterogeneous list (Figure \ref{heteros}). A typed de Bruijn index of type |Index l a| is an index for a variable of type |a| in an environment where the types of the variables are represented by the type level list |l|. We can use these indices to represent lambda terms as follows:
+The second way to ensure well-scopedness is to use typed de Bruijn indices. Here, we present our own modern variant of this technique using Data Kinds and \gadt s, but the idea is essentially the same as presented by Bird and Paterson \cite{nested}. Our representation of typed de Bruijn indices is an index in a heterogeneous list (Fig.\ \ref{heteros}). A typed de Bruijn index of type |Index l a| is an index for a variable of type |a| in an environment where the types of the variables are represented by the type level list |l|. We can use these indices to represent lambda terms as follows:
 \begin{code}
 data Bruijn l a where
   BVar  :: Index l a -> Bruijn l a
@@ -701,11 +701,11 @@ instance PFunctor (TList l) where
 \label{heteros}
 \end{figure}
 
-The types |(forall v. Phoas v a)| and |(Bruijn [] a)| both represent well-scoped typed lambda terms (and |undefined|), and translating from the latter to the former is straightforward. However, there seems to be no way to translate the former to the latter, without using extensions such as the Key monad. In other words there seems to be no function of type:
+The types |(forall v. Phoas v a)| and |(Bruijn [] a)| both represent well-scoped typed lambda terms (and |undefined|), and translating from the latter to the former is straightforward. However, there currently seems to be no way to translate the former to the latter (without using the Key monad). In other words there seems to be no function of type:
 \begin{code}
 phoasToBruijn :: (forall v. Phoas v a) -> Bruijn [] a
 \end{code} 
-This seems to be not only be impossible in Haskell without extensions, but in dependently typed languages without extensions as well. When using |Phoas| in \emph{Coq} to prove properties about programming languages, an small extension to the logic in the form of a special well-scopedness axiom for the |Phoas| data type is needed to translate Phoas to de Bruijn indices\cite{phoas}.
+This seems to be not only be impossible in Haskell without extensions, but in dependently typed languages without extensions as well. For example, when using |Phoas| in \emph{Coq} to prove properties about programming languages, a small extension to the logic in the form of a special well-scopedness axiom for the |Phoas| data type is needed to translate Phoas to de Bruijn indices\cite{phoas}.
 
 The well-scopedness of a |Bruijn| value follows from the fact that the value is well-typed. With |Phoas|, the well-scopedness relies on the meta-level (i.e. not formalized through types) argument that no well-scoped values can be created by using the |Phoas| interface. The internal (i.e. formalized through types) well-scopedness of |Bruijn|, allows interpretations of syntax which seem to not be possible if we are using terms constructed with |Phoas|. As an example of this, consider translating lambda terms to \emph{Cartesian closed category} combinators (the categorical version of the lambda calculus). This can be done if the lambda terms are given as |Bruijn| values, as demonstrated in Figure \ref{ccc}. Without the Key monad, there seem to be no way to do the same for terms constructed with the Phoas terms.
 
