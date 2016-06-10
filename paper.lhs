@@ -65,8 +65,8 @@
   obtain a proof that their types are equal. This gives us a form of
   dynamic typing, without the need for |Typeable| constraints. We
   show that this extension allows us to safely do things we could not
-  otherwise do: it allows us to implement the \st{} monad, to implement an
-  embedded form of arrow notation in Haskell and to translate
+  otherwise do: it allows us to implement the \st{} monad (inefficiently), to implement an
+  embedded form of arrow notation and to translate
   parametric \hoas{} to typed de Bruijn indices, among others. Although strongly
   related to the \st{} monad, the Key monad is simpler and might be 
   easier to prove safe. We do not provide such a proof of the safety of the Key monad, but we note that, surprisingly, a full proof of the safety of
@@ -78,7 +78,7 @@
 
 \section{Introduction}
 
-The \st{} monad \cite{stmonad} in Haskell is an impressive feat of language design, but also a complicated beast. It provides and combines three separate features: (1) an abstraction for {\em global memory references} that can be efficiently written to and read from, (2) a mechanism for embedding computations involving these memory references in {\em pure computations}, and (3) a design that allows references in the same computation to be of {\em arbitrary, different types}, in a type-safe manner.
+The \st{} monad \cite{stmonad} is an impressive feat of language design, but also a complicated beast. It provides and combines three separate features: (1) an abstraction for {\em global memory references} that can be efficiently written to and read from, (2) a mechanism for embedding computations involving these memory references in {\em pure computations}, and (3) a design that allows references in the same computation to be of {\em arbitrary, different types}, in a type-safe manner.
 
 \begin{figure}[t]
 \rule{\columnwidth}{0.4pt}
@@ -98,7 +98,7 @@ data a :~: b where Refl :: a :~: a
 \end{figure}
 
 In this paper, we provide a new abstraction in Haskell (+ \gadt s and rank-2 types) that
-embodies only feature (3) above: the combination of references (which we call {\em keys}) of different, unconstrained types in the same computation. In the \st{} monad, the essential invariant that must hold for feature (3), is that when two references are the same, then their types must also be the same. Our new abstraction splits reasoning based on this invariant into a separate interface, and makes it available to user. The result is a small library called {\em the Key monad}. The \api{} is given in Fig.\ \ref{fig:key-monad}. 
+embodies only feature (3) above: the combination of references (which we call {\em keys}) of different, unconstrained types in the same computation. In the \st{} monad, the essential invariant that must hold for feature (3), is that when two references are the same, then their types \emph{must also be the same}. Our new abstraction splits reasoning based on this invariant into a separate interface, and makes it available to user. The result is a small library called {\em the Key monad}, of which the \api{} is given in Fig.\ \ref{fig:key-monad}. 
 
 The Key monad |KeyM| is basically a crippled version of the \st{} monad: we can monadically create keys of type |Key s a| using the function |newKey|, but we cannot read or write values to these keys; in fact, keys do not carry any values at all. We can convert a computation in |KeyM| into a pure value by means of |runKeyM|, which requires the argument computation to be polymorphic in |s|, just like |runST| would.
 
@@ -109,7 +109,7 @@ The only new feature is the function |testEquality|, which compares two keys for
 
 Why is the Key monad interesting? There are two separate reasons.
 
-First, decoupling the ability to combine different types into one computation from computations involving state allows programmers to use the Key monad in situations where the \st{} monad would not have been suitable. In fact, the bulk of this paper presents examples of uses of the Key monad that would have been impossible without |testEquality|.
+First, the Key monad embodies the insight that when two Keys are the same then their types must be the same, and makes reasoning based on this available to the user via |testEquality|. This makes the Key monad applicable in situations where the \st{} monad would not have been suitable. In fact, the bulk of this paper presents examples of uses of the Key monad that would have been impossible without |testEquality|.
 
 Second, the Key monad is simpler than the \st{} monad, because it does not involve global references, or any updatable state at all. We would like to argue that therefore, the Key monad is easier to understand than the \st{} monad. Moreover, given the Key monad, the \st{} monad is actually implementable in plain Haskell, albeit in a less time- and memory-efficient way than the original \st{} monad (that is, missing feature (1) above, but still providing features (2) and (3)).
 The second reason comes with a possibly unexpected twist.
