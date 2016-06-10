@@ -418,7 +418,7 @@ ifArrow t f = procb z -> do
 Allowing this kind of behavior would make it impossible to translate arrow notation to arrow expressions, because this is exactly the power that monads have but that arrows lack \cite{idiomarrmonad}. To mimic this restriction in our embedded arrow notation, our function |(-<)| has the following type:
 \begin{code}
 (-<) :: Arrow a => a x y -> Cage s x -> 
-              ArrowSyntax s (Cage s y)
+              ArrowSyntax a s (Cage s y)
 \end{code}
 The type |ArrowSyntax| is the monad which we use to define our embedded
 arrow notation. The input and output of the arrow computations are
