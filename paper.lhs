@@ -59,18 +59,14 @@
 
 
 \begin{abstract}
-\pablo{To discuss: There are grammatical errors in this abstract that
-  I believe I have fixed but
-  were rolled back. The same mistakes occur in other places in the
-  paper when listing the things we could 'otherwise not do'.}
  We present a small extension to Haskell (+ \gadt s and rank-2 types) called the
   Key monad. With the Key monad, unique keys of different types can be
   created and can be tested for equality. When two keys are equal, we
   obtain a proof that their types are equal. This gives us a form of
   dynamic typing, without the need for |Typeable| constraints. We
   show that this extension allows us to safely do things we could not
-  otherwise do, namely: implement the \st{} monad, implement an
-  embedded form of arrow notation in Haskell and translate
+  otherwise do: it allows us to implement the \st{} monad, to implement an
+  embedded form of arrow notation in Haskell and to translate
   parametric \hoas{} to typed de Bruijn indices, among others. Although strongly
   related to the \st{} monad, the Key monad is simpler and might be 
   easier to prove safe. We do not provide such a proof of the safety of the Key monad, but we note that, surprisingly, a full proof of the safety of
@@ -127,12 +123,12 @@ This paper does not provide a formal safety proof of the Key monad. Instead, we 
 Our contributions are as follows:
 \begin{itemize}
 \item We present the Key monad (Section \ref{keym}) and argue for its safety (Section \ref{safety}).
-\item We show that added power of the Key monad allows us to do things we cannot do without it, namely:
+\item We show that the added power of the Key monad allows us to do things we cannot do without it, namely it allows us
      \begin{itemize}
-          \item Implement the \st{} monad (Section \ref{keym}).
-          \item Implement an \emph{embedded} form of arrow notation (Section \ref{arrow}).
-          \item Represent typed variables in typed representations of syntax (Section \ref{syntax}).
-          \item Translate parametric \hoas{} to nested de Bruijn indices, which allows interpretations of parametric \hoas{} terms, such translation to Cartesian closed categories, which are not possible otherwise (Section \ref{syntax}).
+          \item to implement the \st{} monad (Section \ref{keym});
+          \item to implement an \emph{embedded} form of arrow notation (Section \ref{arrow});
+          \item to represent typed variables in typed representations of syntax (Section \ref{syntax});
+          \item to translate parametric \hoas{} to nested de Bruijn indices, which allows interpretations of parametric \hoas{} terms, such as translation to Cartesian closed categories, which are not possible otherwise (Section \ref{syntax}).
 \end{itemize}
 \item We present an argument why the Key monad is not expressible in Haskell (without |unsafeCoerce|) (Section \ref{impl}).
 \end{itemize}
@@ -1108,7 +1104,7 @@ For this reason, the type that is bound to |q| is \emph{the same type} for all v
 \section{Discussion on the \st{} monad proof}
 \label{stdis}
 
-The \st{} monad was introduced in \cite{stmonad} and contained some safety statements and also a high-level description of a proof. The proof sketch mentions the use of parametricity, which is a doubtful proof technique to use because it is not established that parametricity still holds for a language with the \st{} monad. A follow-up paper \cite{LaunchburySabry} mentions another problem with the first paper, in particular that implementations of the lazy \st{} monad may actually generate the wrong result in a setting that is more eager. This paper claims to fix those issues with a new semantics and proof sketch. However, a bug in this safety proof was discovered, which lead to a series of papers\cite{LaunchburySabry,AriolaSabry} formalizing the treatment of different versions of encapsulating strict and lazy state threads in a functional language, culminating in \cite{MoggiSabry}. This paper gives different formulations of strict and lazy state threads, one of them corresponding to lazy state threads in Haskell. The aim of the paper is to establish {\em type safety} of state threads. However, the paper only provides a proof sketch of type safety for one of the formulations, and only claims type safety (without a proof) for the other ones. With the exception of the original paper\cite{stmonad}, all these papers consider only \emph{local state}, that is, each state thread has its own memory, in contrast to the actual implementation of the \st{} monad.
+The \st{} monad was introduced in \cite{stmonad} and contained some safety statements and also a high-level description of a proof. The proof sketch mentions the use of parametricity, which is a doubtful proof technique to use because it is not established that parametricity still holds for a language with the \st{} monad. A follow-up paper \cite{LaunchburySabry} mentions another problem with the first paper, in particular that implementations of the lazy \st{} monad may actually generate the wrong result in a setting that is more eager. This paper claims to fix those issues with a new semantics and proof sketch. However, a bug in this safety proof was discovered, which led to a series of papers\cite{LaunchburySabry,AriolaSabry} formalizing the treatment of different versions of encapsulating strict and lazy state threads in a functional language, culminating in \cite{MoggiSabry}. This paper gives different formulations of strict and lazy state threads, one of them corresponding to lazy state threads in Haskell. The aim of the paper is to establish {\em type safety} of state threads. However, the paper only provides a proof sketch of type safety for one of the formulations, and only claims type safety (without a proof) for the other ones. With the exception of the original paper~\cite{stmonad}, all these papers consider only \emph{local state}, that is, each state thread has its own memory, in contrast to the actual implementation of the \st{} monad.
 
 Even if type safety may now be considered to have been established by these papers, we are still left with referential transparency and abstraction safety. We are unaware of any work that attempts to establish parametricity or referential transparency in the presence of the \st{} monad. Referential transparency is quite tricky for actual implementations of the \st{} monad since efficient implementations use global pointers. Abstraction safety is also very important because most people assume that parametricity in Haskell actually holds, without giving it a second thought that the \st{} monad may destroy it. 
 
@@ -1116,7 +1112,7 @@ Now, we actually believe that the \st{} monad (and also the Key monad) is safe i
 
 \section{Conclusion}
 
-In the \st{} monad, one of the invariants that must hold is that when two references are the same, then their types must also be the same. We presented the Key monad, which splits reasoning based on this invariant into a separate interface, and makes it available to user. We showed that this new interface gives a form of dynamic typing without the need for |Typeable| constraints, which allows us to do things we could not do before: implement the \st{} monad, implement an embedded form of arrow syntax and translate parametric \hoas{} to typed de Bruijn indices. The Key monad is simpler than the \st{} monad, since it embodies just one aspect of it. A full proof of the safety of the \st{} monad remains elusive to this day, and a proof of the safety of the Key might be a stepping stone towards it.
+In the \st{} monad, one of the invariants that must hold is that when two references are the same, then their types must also be the same. We presented the Key monad, which splits reasoning based on this invariant into a separate interface, and makes it available to the user. We showed that this new interface gives a form of dynamic typing without the need for |Typeable| constraints, which allows us to do things we could not do before: it allows us to implement the \st{} monad, to implement an embedded form of arrow syntax and to translate parametric \hoas{} to typed de Bruijn indices. The Key monad is simpler than the \st{} monad, since the former embodies just one aspect of the latter. A full proof of the safety of the \st{} monad remains elusive to this day, but a proof of the safety of the Key monad might be a stepping stone towards it.
 
 \paragraph{Acknowledgements}
 We thank Gershom Bazerman, Jonas Dure\-g{\aa}rd and John Hughes for helpful comments and insightful discussions.
