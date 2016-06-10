@@ -59,7 +59,7 @@
 
 
 \begin{abstract}
- We present a small extension to Haskell (+ \gadt s and rank-2 types) called the
+ We present a small extension to Haskell called the
   Key monad. With the Key monad, unique keys of different types can be
   created and can be tested for equality. When two keys are equal, we
   obtain a proof that their types are equal. This gives us a form of
@@ -97,7 +97,7 @@ data a :~: b where Refl :: a :~: a
 \label{fig:key-monad}
 \end{figure}
 
-In this paper, we provide a new abstraction in Haskell that
+In this paper, we provide a new abstraction in Haskell (+ \gadt s and rank-2 types) that
 embodies only feature (3) above: the combination of references (which we call {\em keys}) of different, unconstrained types in the same computation. In the \st{} monad, the essential invariant that must hold for feature (3), is that when two references are the same, then their types must also be the same. Our new abstraction splits reasoning based on this invariant into a separate interface, and makes it available to user. The result is a small library called {\em the Key monad}. The \api{} is given in Fig.\ \ref{fig:key-monad}. 
 
 The Key monad |KeyM| is basically a crippled version of the \st{} monad: we can monadically create keys of type |Key s a| using the function |newKey|, but we cannot read or write values to these keys; in fact, keys do not carry any values at all. We can convert a computation in |KeyM| into a pure value by means of |runKeyM|, which requires the argument computation to be polymorphic in |s|, just like |runST| would.
@@ -132,9 +132,9 @@ Our contributions are as follows:
 \end{itemize}
 \item We present an argument why the Key monad is not expressible in Haskell (without |unsafeCoerce|) (Section \ref{impl}).
 \end{itemize}
-We discuss the state of the proof of the safety of the \st{} monad in section \ref{stdis} and we conclude in Section \ref{conc}.
+We discuss the state of the proof of the safety of the \st{} monad in section \ref{stdis} and we conclude in Section \ref{conc}.\\[0.05cm]
 
-The Haskell code discussed in this paper can be found online at: 
+\noindent The Haskell code discussed in this paper can be found online at: 
 \url{https://github.com/koengit/KeyMonad}
 
 \section{The Key monad}
@@ -289,7 +289,7 @@ Informally, the Key monad allows us to create new keys and compare them, maybe o
 \begin{figure}
 \hspace{-0.7cm}
 \begin{tabular}{ r  c  l r}
-\begin{minipage}{0.42\columnwidth}
+\begin{minipage}{0.4\columnwidth}
 \begin{code}
 do  k <- newKey 
     f (testEquality k k)
@@ -300,7 +300,7 @@ do  k <- newKey
     f (Just Refl)
 \end{code}
 \end{minipage}& (|sameKey|) \\[-0.2cm]
-\begin{minipage}{0.42\columnwidth}
+\begin{minipage}{0.4\columnwidth}
 \begin{code}
 do  k <- newKey 
     l <- newKey
