@@ -107,12 +107,13 @@ The only new feature is the function |testEquality|, which compares two keys for
 
 
 
-Why is the Key monad interesting? There are two separate reasons.
+Why is the Key monad interesting? There are three separate reasons.
 
 First, the Key monad embodies the insight that when two Keys are the same then their types must be the same, and makes reasoning based on this available to the user via |testEquality|. This makes the Key monad applicable in situations where the \st{} monad would not have been suitable. In fact, the bulk of this paper presents examples of uses of the Key monad that would have been impossible without |testEquality|.
 
 Second, the Key monad is simpler than the \st{} monad, because it does not involve global references, or any updatable state at all. We would like to argue that therefore, the Key monad is easier to understand than the \st{} monad. Moreover, given the Key monad, the \st{} monad is actually implementable in plain Haskell, albeit in a less time- and memory-efficient way than the original \st{} monad (that is, missing feature (1) above, but still providing features (2) and (3)).
-The second reason comes with a possibly unexpected twist.
+
+This second reason comes with a possibly unexpected twist.
 
 After its introduction in 1994, several papers have claimed to establish the safety, fully or partially, of the \st{} monad in Haskell \cite{stmonad,LaunchburySabry,AriolaSabry,MoggiSabry}. By safety we mean three things: (a) type safety (programs using the \st{} monad are still type safe), (b) referential transparency (programs using the \st{} monad are still referentially transparent), and (c) abstraction safety (programs using the \st{} monad still obey the parametricity theorem). It came as a complete surprise to the authors that {\em none of the papers we came across in our literature study actually establishes the safety of the \st{} monad in Haskell!}
 
