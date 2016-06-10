@@ -32,6 +32,7 @@ unpack :: (forall s. ST s a) -> (forall s. StateT (KeyMap s) (KeyM s) a)
 unpack (ST m) = m
 
 runST :: (forall s. ST s a) -> a
-runST m = runKeyM (evalStateT (unpack m) empty)
+runST m = runKeyM $ case m of
+           ST n -> evalStateT n empty
  
 

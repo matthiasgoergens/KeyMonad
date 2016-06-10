@@ -210,14 +210,11 @@ readSTRef r = ST $ (getr) <$> get
 writeSTRef :: STRef s a -> a -> ST s ()
 writeSTRef k v = ST $ modify (insert k v)
 \end{code}
-Finally, the implementation of |runST| simply runs the monadic computation contained in the \st{} type, but needs some extra annotations to convince the type checker:
+Finally, the implementation of |runST| simply runs the monadic computation contained in the \st{} type:
 \begin{code}
 runST :: (forall s. ST s a) -> a
-runST m = runKeyM (evalStateT (unpack m) empty)
-
-unpack ::  (forall s. ST s a) -> 
-           (forall s. StateT (KeyMap s) (KeyM s) a)
-unpack (ST m) = m
+runST m = runKeyM $ case m of
+           ST n -> evalStateT n empty
 \end{code}
 
 \subsection{Relation with the \st{} monad}
