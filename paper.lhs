@@ -814,7 +814,7 @@ The argument why the scope type variable |s| and the key value |k| together uniq
 \begin{enumerate}
 \item Each execution of a Key monad computation has a scope type variable |s| that is distinct from the scope type variables of all other Key monad computations. This is ensured by the type of |runKeyM|, namely |(forall s. KeyM s a) -> a|, which states that the type |s| cannot be unified with any other type. 
 \item Each |newKey| operation in such a Key monad computation gives a value that is unique within the scope determined by |s|, i.e. distinct from other keys created in the same computation.
-\item Each key only has \emph{a single type} associated with it. This is ensured by the type of |newKey|, which only allows us to construct a key with a single type, i.e. not a key of type |forall a. Key s a|, because the type of a hypothetical function |createPolymorphicKey :: KeyM (forall a. Key s a)| would not unify with the type of |newKey|. 
+\item Each key only has \emph{a single type} associated with it. This is ensured by the type of |newKey|, which only allows us to construct a key with a single type, i.e. not a key of type |forall a. Key s a|. The type of a hypothetical function |newPolymorphicKey :: KeyM s (forall a. Key s a)| does not unify with the type of |newKey|. 
 \end{enumerate}
 
 
