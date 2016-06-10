@@ -124,7 +124,7 @@ This paper does not provide a formal safety proof of the Key monad. Instead, we 
 
 Our contributions are as follows:
 \begin{itemize}
-\item We present the Key monad (Section \ref{keym}) and informally argue for its safety (Section \ref{safety}).
+\item We present the Key monad (Section \ref{keym}), its implementation (Section \ref{impl}), and informally argue for its safety (Section \ref{safety}).
 \item We show that the added power of the Key monad allows us to do things we cannot do without it, namely it allows us
      \begin{itemize}
           \item to implement the \st{} monad (Section \ref{keym});
@@ -132,9 +132,8 @@ Our contributions are as follows:
           \item to represent typed variables in typed representations of syntax (Section \ref{syntax});
           \item to translate parametric \hoas{} to nested de Bruijn indices, which allows interpretations of parametric \hoas{} terms, such as translation to Cartesian closed categories, which are not possible otherwise (Section \ref{syntax}).
 \end{itemize}
-\item We present an informal argument why the Key monad is not expressible in Haskell (without |unsafeCoerce|) (Section \ref{impl}).
+\item We identify some key missing pieces in the correctness proof of the \st{} monad (Section \ref{stdis}). The Key monad may be a stepping stone to finding this proof.
 \end{itemize}
-We discuss the state of the proof of the safety of the \st{} monad in section \ref{stdis} and we conclude in Section \ref{conc}.\\[0.05cm]
 
 \noindent The Haskell code discussed in this paper can be found online at: 
 \url{https://github.com/koengit/KeyMonad}
