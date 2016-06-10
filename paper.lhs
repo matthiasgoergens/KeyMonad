@@ -927,6 +927,8 @@ What this shows is that (1) adding the Key monad to a normalizing language may m
 \label{impl}
 Is the Key monad expressible in Haskell directly, without using |unsafeCoerce|? Can we employ more recent advancements such as  \gadt s to ``prove'' to the type system that the Key monad is safe? In this section, we explore how far we can get (and fail).
 
+The question of whether or not the Key monad is implementable in Haskell (with extensions) is related to the question of whether or not the \st{} monad is implementable in Haskell (with extensions): a negative answer to the latter implies a negative answer to the former. The latter question, about \st{}, was (as far as we know) first publicly asked by the second author on the Haskell mailing list in 2001 \cite{koen2001}, accompanied by a proposal of an early version of the Key monad, then called the ``Object monad''. Since then, the question has regularly popped up on online discussion forums \cite{stackoverflow,reddit}. The question has never been answered positively, which we take as a strong indication that the Key monad is also not implementable in Haskell (with extensions).
+
 \subsection{Implementation using |unsafeCoerce|}
 
 To get a feel for possible implementations of the Key monad, let us first consider a straightforward implementation, using \emph{unsafeCoerce}, in which we give each key a unique name. One could implement generating unique names using a state monad, but the |(purity)| key monad law (|m >> n == n)| would then not hold. Instead, we implement the Key monad using an splittable name supply, with the following interface:
