@@ -210,14 +210,11 @@ readSTRef r = ST $ (getr) <$> get
 writeSTRef :: STRef s a -> a -> ST s ()
 writeSTRef k v = ST $ modify (insert k v)
 \end{code}
-Finally, the implementation of |runST| simply runs the monadic computation contained in the \st{} type, but needs some extra annotations to convince the type checker:
+Finally, the implementation of |runST| simply runs the monadic computation contained in the \st{} type:
 \begin{code}
 runST :: (forall s. ST s a) -> a
-runST m = runKeyM (evalStateT (unpack m) empty)
-
-unpack ::  (forall s. ST s a) -> 
-           (forall s. StateT (KeyMap s) (KeyM s) a)
-unpack (ST m) = m
+runST m = runKeyM $ case m of
+           ST n -> evalStateT n empty
 \end{code}
 
 \subsection{Relation with the \st{} monad}
@@ -971,6 +968,8 @@ A |KeyM| computation consisting of |>>=|,|return| and |newKey| can also be seen 
 runKeyM $ (m >> newKey) >>= f
 \end{code}
 will get the name |Right (Left Start)|.
+
+Note that the Key monad laws from Figure \ref{laws} only hold for this implementation \emph{up to observation}. If we have access to the definition of Keys, we can discriminate between, for example, |m >> n| and |n|. However, in the interface |Key| is an abstract type, and thus users can be blissfully ignorant of this.
 
 A downside of this implementation is that |testEquality| is linear in the length of the tree paths. A more efficient implementation of the Key monad uses |Integer|s to represent keys and deals out unique names by unsafely reading and updating a mutable variable which is unsafely created in |runKey|. A full implementation of this version of the Key monad can be found in the code online.
 
