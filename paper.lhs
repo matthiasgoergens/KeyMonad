@@ -163,18 +163,18 @@ If we used the right key, we get |Just| the value in the box, and we get |Nothin
 
 We can use |Box|es to create a kind of \emph{heterogeneous maps}: a data structure that that maps keys to values of the type corresponding to the key. The interesting feature here is that the type of these heterogenous maps does not depend on the types of the values that are stored in it, nor do the functions have |Typeable| constraints. We can implement such maps straightforwardly as follows\footnote{For simplicity, this is a rather inefficient implementation, but a more efficient implementation (using |IntMap|s) can be given if we add a function |hashKey :: Key s a -> Int| to the Key monad.}:
 \begin{code}
-newtype KeyMap s = Km [Box s]
+newtype KeyMap s = KM [Box s]
 
 empty :: KeyMap s
-empty = Km []
+empty = KM []
 
 insert :: Key s a -> a -> KeyMap s -> KeyMap s
-insert k v (Km l) = Km (Lock k v : l)	
+insert k v (KM l) = KM (Lock k v : l)	
 
 lookup :: Key s a -> KeyMap s -> Maybe a
-lookup k (Km [])       = Nothing
-lookup k (Km (h : t))  = 
-  unlock k h `mplus` lookup k (Km t)
+lookup k (KM [])       = Nothing
+lookup k (KM (h : t))  = 
+  unlock k h `mplus` lookup k (KM t)
 
 (!) :: KeyMap s -> Key s a -> a
 m ! k = fromJust (lookup k m)
@@ -743,7 +743,7 @@ instance PFunctor (FBox s) where
   pfmap f (FLock k x) = FLock k (f x)
 \end{code} We also need a variant of the |KeyMap|, where we store |FBox|es instead of regular boxes:
 \begin{code}
-newtype FKeyMap s f = FKm [FBox s f]
+newtype FKeyMap s f = FKM [FBox s f]
 insert :: Key s a -> f a -> FKeyMap s f  -> FKeyMap s f
 lookup :: Key s a -> FKeyMap s f -> Maybe (f a)
 instance PFunctor (FKeyMap s)
