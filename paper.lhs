@@ -692,9 +692,9 @@ index :: TList l f -> Index l a -> f a
 index (h ::: _) Head     = h
 index (_ ::: t) (Tail i) = index t i
 
-instance PFunctor (TList l) where
-  pfmap f TNil      = TNil
-  pfmap f (h ::: t) = f h ::: pfmap f t
+instance FFunctor (TList l) where
+  ffmap f TNil      = TNil
+  ffmap f (h ::: t) = f h ::: ffmap f t
 \end{code}
 \caption{Heterogeneous list and indexes in them.}
 \label{heteros}
@@ -740,25 +740,25 @@ funlock k (FLock k' x) =
 \end{code}
 The difference with |Box| is that we now store values of type |f a| instead of values of type |a| in the box. We provide a variant of |fmap| for this container:
 \begin{code}
-class PFunctor p where
-  pfmap :: (forall x. f x -> g x) -> p f -> p g
+class FFunctor p where
+  ffmap :: (forall x. f x -> g x) -> p f -> p g
 
-instance PFunctor (FBox s) where
-  pfmap f (FLock k x) = FLock k (f x)
+instance FFunctor (FBox s) where
+  ffmap f (FLock k x) = FLock k (f x)
 \end{code} We also need a variant of the |KeyMap|, where we store |FBox|es instead of regular boxes:
 \begin{code}
 newtype FKeyMap s f = FKM [FBox s f]
 empty   :: FKeyMap s f
 insert  :: Key s a -> f a -> FKeyMap s f  -> FKeyMap s f
 lookup  :: Key s a -> FKeyMap s f -> Maybe (f a)
-instance PFunctor (FKeyMap s)
+instance FFunctor (FKeyMap s)
 \end{code}
 
 To translate to de Bruijn indices, we store the current ``environment'' as an |FKeyMap| mapping each |Key| to an |Index| in the current environment. When we enter a lambda-body, we need to extend the environment: we add a mapping of the new variable to the de Bruijn index |Head|, and add one lookup step to each other de Bruijn index currently in the |FKeyMap|. This is be done as follows:
 \begin{code}
-extend :: Key s h -> FKeyMap s (Index t) ->
-            FKeyMap s (Index (h : t))
-extend k m = insert k Head (pfmap Tail m)
+extend ::  Key s h -> FKeyMap s (Index t) ->
+           FKeyMap s (Index (h : t))
+extend k m = insert k Head (ffmap Tail m)
 \end{code}
 With this machinery in place, we can translate |KExp| to |Bruijn| as follows:
 \begin{code}
@@ -787,12 +787,12 @@ toClosed p = go p TNil where
   go :: CCC c => Bruijn l y -> TList l (c x) -> c x y
   go (BVar x)    e = index e x
   go (BLam b)    e = 
-    curry $ go b (snd ::: pfmap (:.. fst) e)
+    curry $ go b (snd ::: ffmap (:.. fst) e)
   go (BApp f x)  e = uncurry (go f e) :. prod id (go x e)
 
-instance PFunctor (TList l) where
-  pfmap f TNil      = TNil
-  pfmap f (h ::: t) = f h ::: pfmap f t
+instance FFunctor (TList l) where
+  ffmap f TNil      = TNil
+  ffmap f (h ::: t) = f h ::: ffmap f t
 \end{code}
 \label{ccc}
 \caption{Translating lambda terms to Cartesian closed categories.}
