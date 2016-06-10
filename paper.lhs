@@ -232,15 +232,13 @@ testEquality x y
 \end{code}
 The |unsafeCoerce| in |x == unsafeCoerce y| is needed because the types of the references might not be the same. Hence, another way to think of this paper is that we claim that the above function is \emph{safe}, that this allows us to do things which we could not do before, and that we propose this as an extension of the \st{} monad library. 
 
-With the above |testEquality| function for |STRef|s it is possible to implement something similar to the Key monad, but the Key monad is more lazy. In particular, even for the lazy \st{} monad, the following holds:
-\begin{code} 
-undefined >> m § == § undefined
-\end{code}
-whereas for the Key monad (as we shall see in Sect.\ \ref{seclaws}), we have:
+With the above |testEquality| function for |STRef|s it is possible to implement something similar to the Key monad, but the Key monad is more lazy. In particular, for the Key monad, the following holds: 
 \begin{code} 
 undefined >> m § == § m
 \end{code}
-This allows us to create an infinite list of |Key|s for example:
+This does not hold even for the lazy \st{} monad, which will give |undefined| on for example |undefined >> newSTRef 0|.
+
+The extra laziness of the Key monad allows us to create an infinite list of |Key|s for example:
 \begin{code}
 newKeys :: KeyM s [Key s a]
 newKeys = liftM2 (:) newKey newKeys
@@ -408,7 +406,7 @@ addA f g = proc $ \z -> do
     y <- g -< z
     return $ (+) <$> x <*> y
 \end{code}
-We use a function conveniently called |proc| and use an infix function conveniently called |(-<)|. Slightly less nice is that we now have to use the |Applicative| interface to combine values resulting from arrow computations: we have to write |(+) <$> x <*> y| instead of |x + y|. Note that |proc| is a \emph{function}, which does all the plumbing to rewrite the syntax to a point-free expression which is normally done in a compiler pass.
+We use a function conveniently called |proc| and use an infix function conveniently called |(-<)|. Slightly less nice is that we now have to use the |Applicative| interface to combine values resulting from arrow computations: we have to write |(+) <$> x <*> y| instead of |x + y|. Note that |proc| is a \emph{function}, which does all the plumbing to rewrite the syntax to a point-free expression, which is normally done in a compiler pass.
 
 The difference between |do| notation and arrow notation is that in arrow notation, one cannot observe intermediate values to decide what to do next. For example, we \emph{cannot} do the following:
 \begin{code}
@@ -440,7 +438,7 @@ a |KeyMap| to a value of type |x|. Hence we can be sure that
 arrow computations returning a |Cage| do not allow pattern-matching on the result,
 % we do not allow pattern matching on the result of an arrow
 % computation
-because the result is simply not available. In the usage of |Applicative| in the expression |(+) <$> x <*> y|  we saw earlier, uses the |Applicative| instance of |Cage|s. 
+because the result is simply not available. The expression |(+) <$> x <*> y|  we saw earlier in the function |addA|, uses the |Applicative| instance of |Cage|s. 
 
 In our construction, we use |Key|s as names, and |KeyMap|s as
 \emph{environments}, i.e. mappings from names to values.  Each result
@@ -456,7 +454,7 @@ proc ::  Arrow a =>
       -> a x y
 \end{code}
 
-Internally, the |ArrowSyntax| monad builds an \emph{environment arrow}, an arrow from environment to environment, i.e. an arrow of type |a (KeyMap s) (KeyMap s)|. The |ArrowSyntax| monad creates names for values in these environments using |KeyM|.
+Internally, the |ArrowSyntax| monad builds an \emph{environment arrow}: an arrow from environment to environment, i.e. an arrow of type |a (KeyMap s) (KeyMap s)|. The |ArrowSyntax| monad creates names for values in these environments using |KeyM|.
 \begin{code}
 newtype ArrowSyntax a s x =
     AS (WriterT (EnvArrow a s) (KeyM s) x)
@@ -473,7 +471,7 @@ instance Arrow a => Monoid (EnvArrow a x) where
     mappend (EnvArrow l) (EnvArrow r) = 
          EnvArrow (l >>> r)
 \end{code}
-The standard writer monad transformer, |WriterT|, produces |mempty| for |return|, and composes the built values from from the left and right hand side of |>>=| using |mappend|, giving us precisely what we need for building arrows. 
+The definition of |ArrowSyntax| uses the standard writer monad transformer, |WriterT|, which produces |mempty| for |return|, and composes the built values from from the left and right hand side of |>>=| using |mappend|, giving us precisely what we need for building arrows. 
 
 
 
@@ -517,7 +515,7 @@ toEnvArrow inC outK a  = EnvArrow $
 \end{code}
 We first produce the input to the argument arrow, by interpreting the input expression using the input environment. We then execute the argument arrow, and bind its output to the given name to obtain the output environment. 
 
-The |-<| operation gets the arrow and the input expression as an argument, creates a name for the output, and then passes these three to |toEnvArrow|:
+The (|-<|) operation gets the arrow and the input expression as an argument, creates a name for the output, and then passes these three to |toEnvArrow|:
 \begin{code}
 (-<) :: Arrow a =>
         a x y ->
@@ -594,7 +592,7 @@ toRelativeM :: RelativeMonad rm v =>
 toRelativeM (Pure x)      = rreturn x
 toRelativeM (Unpure m f)  = m .>>= (toRelativeM :. f)
 \end{code}
-The insight is because a computation must eventually return a value of |v a| to convert a relative monad computation via |toRelativeM|, any pure value that is used, can eventually be removed via the monad law |return x >>= f == f x|. Our embedded arrow construction can be seen as relative monad, where we apply this trick to obtain a monadic interface.
+The insight is that because a computation must eventually return a value of |v a| to convert a relative monad computation via |toRelativeM|, any pure value that is used, can eventually be removed via the monad law |return x >>= f == f x|. Our embedded arrow construction can be seen as relative monad, where we apply this trick to obtain a monadic interface.
 
 Our construction hence suggests that arrows are also a special case of relative monad in Haskell with the key monad, but a formal proof (using the Key monad laws from Figure (\ref{laws})) is outside the scope of this paper. In the code online, we also show that this construction can be extended to use \emph{relative monadfix} (with function  |rmfix :: (v a -> m a) -> m a|) to construct arrows using |ArrowLoop|, but the we cannot use recursive monad notation in this case, because the above trick does not extend to Monadfix.
 
@@ -630,7 +628,7 @@ data KExp s a where
   KLam  ::  Key s a -> KExp s b -> KExp s (a -> b)
   KApp  ::  KExp s (a -> b) -> KExp s a -> KExp s b
 \end{code}
-Because the names are now represented as keys, we can represented an environment as a |KeyMap|. We can even offer a Higher Order Abstract Syntax (\hoas{}) \cite{hoas} interface for constructing such terms by threading the key monad computation, which guarantees that all terms constructed with this interface are well-scoped:
+Because the names are now represented as keys, we can represent an environment as a |KeyMap|. We can even offer a Higher Order Abstract Syntax (\hoas{}) \cite{hoas} interface for constructing such terms by threading the key monad computation, which guarantees that all terms constructed with this interface are well-scoped:
 \begin{code}
 class Hoas f where 
   lam :: (f a -> f b)  -> f (a -> b)
@@ -708,7 +706,7 @@ phoasToBruijn :: (forall v. Phoas v a) -> Bruijn [] a
 \end{code} 
 This seems to be not only be impossible in Haskell without extensions, but in dependently typed languages without extensions as well. For example, when using |Phoas| in \emph{Coq} to prove properties about programming languages, a small extension to the logic in the form of a special well-scopedness axiom for the |Phoas| data type is needed to translate Phoas to de Bruijn indices\cite{phoas}.
 
-The well-scopedness of a |Bruijn| value follows from the fact that the value is well-typed. With |Phoas|, the well-scopedness relies on the meta-level (i.e. not formalized through types) argument that no ill-scoped values can be created using the |Phoas| interface. The internal (i.e. formalized through types) well-scopedness of |Bruijn|, allows interpretations of syntax which seem to not be possible if we are using terms constructed with |Phoas|. As an example of this, consider translating lambda terms to \emph{Cartesian closed category} combinators (the categorical version of the lambda calculus), which is useful for translating lambda terms to hardware \cite{conalccc}. This can be done if the lambda terms are given as |Bruijn| values, as demonstrated in Figure \ref{ccc}. Without the Key monad, there seem to be no way to do the same for terms constructed with the Phoas terms, but with the |Key| monad we can for example first translate to de Bruijn indices and then to Cartesian closed categories. 
+The well-scopedness of a |Bruijn| value follows from the fact that the value is well-typed. With |Phoas|, the well-scopedness relies on the meta-level (i.e. not formalized through types) argument that no ill-scoped values can be created using the |Phoas| interface. The internal (i.e. formalized through types) well-scopedness of |Bruijn|, allows interpretations of syntax which seem to not be possible if we are using terms constructed with |Phoas|. As an example of this, consider translating lambda terms to \emph{Cartesian closed category} combinators (the categorical version of the lambda calculus), which is useful for translating lambda terms to hardware \cite{conalccc}. This can be done if the lambda terms are given as |Bruijn| values, as demonstrated in Figure \ref{ccc}. Without the Key monad, there seem to be no way to do the same for terms constructed with the |Phoas| terms, but with the |Key| monad we can for example first translate to de Bruijn indices and then to Cartesian closed categories. 
 
 Our implementation of |phoasToBruijn| works by first translating |Phoas| to the |KExp| from the previous subsection, and then translating that to typed de Bruijn indices. The first step in this translation is straightforwardly defined using the |Hoas| interface from the previous subsection: 
 \begin{code}
@@ -807,7 +805,7 @@ instance FFunctor (TList l) where
 \section{Safety of the Key monad}
 \label{safety}
 
-In this section, we precisely state what we mean by safety, and informally argue for the safety of the Key monad.
+In this section, we state more precisely what we mean by safety, and informally argue for the safety of the Key monad.
 
 \subsection{Type safety}
 
@@ -848,7 +846,7 @@ boolBool =
 boolInt  = 
   AbsBool  0 1        (\c t f -> if c == 0 then t else f)
 \end{code}
-If our language is abstraction safe, then it is impossible to observe any difference between |boolBool| and |boolInt|. This property is formalized by \emph{parametricity} (which also gives ``free'' theorems \cite{theoremsforfree}). A typical example of a primitive which is not abstraction safe (but is type-safe) is a primitive that allows us to check the equality of any two types:
+If a language is abstraction safe, then it is impossible to observe any difference between |boolBool| and |boolInt|. This property is formalized by \emph{parametricity} (which also gives ``free'' theorems \cite{theoremsforfree}). A typical example of a primitive which is not abstraction safe (but is type-safe) is a primitive that allows us to check the equality of any two types:
 \begin{code}
 badTest :: a -> b -> Maybe (a :~: b)
 \end{code}
@@ -975,7 +973,7 @@ testEquality (Key l) (Key r)
   | otherwise  = Nothing
 \end{code}
 
-A |KeyM| computation consisting of |>>=|,|return| and |newKey| can also be seen as a binary tree where binds are node, |newKey|s are leaves and |return|s are empty subtrees. The |Name| associated with each key is the path to the |newKey| that created it, in the tree that corresponds to the |KeyM| computation. For example, the Key resulting from the |newKey| in the expression:
+A |KeyM| computation consisting of |>>=|,|return| and |newKey| can also be seen as a binary tree where binds are nodes, |newKey|s are leaves and |return|s are empty subtrees. The |Name| associated with each key is the path to the |newKey| that created it, in the tree that corresponds to the |KeyM| computation. For example, the Key resulting from the |newKey| in the expression:
 \begin{code}
 runKeyM $ (m >> newKey) >>= f
 \end{code}
