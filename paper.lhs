@@ -707,19 +707,17 @@ phoasToBruijn :: (forall v. Phoas v a) -> Bruijn [] a
 \end{code} 
 This seems to be not only be impossible in Haskell without extensions, but in dependently typed languages without extensions as well. For example, when using |Phoas| in \emph{Coq} to prove properties about programming languages, a small extension to the logic in the form of a special well-scopedness axiom for the |Phoas| data type is needed to translate Phoas to de Bruijn indices\cite{phoas}.
 
-The well-scopedness of a |Bruijn| value follows from the fact that the value is well-typed. With |Phoas|, the well-scopedness relies on the meta-level (i.e. not formalized through types) argument that no well-scoped values can be created by using the |Phoas| interface. The internal (i.e. formalized through types) well-scopedness of |Bruijn|, allows interpretations of syntax which seem to not be possible if we are using terms constructed with |Phoas|. As an example of this, consider translating lambda terms to \emph{Cartesian closed category} combinators (the categorical version of the lambda calculus). This can be done if the lambda terms are given as |Bruijn| values, as demonstrated in Figure \ref{ccc}. Without the Key monad, there seem to be no way to do the same for terms constructed with the Phoas terms.
+The well-scopedness of a |Bruijn| value follows from the fact that the value is well-typed. With |Phoas|, the well-scopedness relies on the meta-level (i.e. not formalized through types) argument that no ill-scoped values can be created using the |Phoas| interface. The internal (i.e. formalized through types) well-scopedness of |Bruijn|, allows interpretations of syntax which seem to not be possible if we are using terms constructed with |Phoas|. As an example of this, consider translating lambda terms to \emph{Cartesian closed category} combinators (the categorical version of the lambda calculus). This can be done if the lambda terms are given as |Bruijn| values, as demonstrated in Figure \ref{ccc}. Without the Key monad, there seem to be no way to do the same for terms constructed with the Phoas terms.
 
 Our implementation of |phoasToBruijn| works by first translating |Phoas| to the |KExp| from the previous subsection, and then translating that to typed de Bruijn indices. The first step in this translation is straightforwardly defined using the |Hoas| interface from the previous subsection: 
 \begin{code}
-phoasToKey ::  (forall v. Phoas v a) ->
-               (forall s. KeyM s (KExp s a))
+phoasToKey ::  (forall v. Phoas v a) -> KeyM s (KExp s a)
 phoasToKey v = getExp (go v) where
   go :: Phoas (HoasKey s) a -> HoasKey s a
   go (PVar v)    = v
   go (PLam f)    = lam (go :. f)
   go (PApp f x)  = app (go f) (go x)
 \end{code}
-
 We will now show how we can create a function of type:
 \begin{code}
 keyToBruijn :: KExp s a -> Bruijn [] a
