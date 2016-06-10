@@ -969,6 +969,8 @@ runKeyM $ (m >> newKey) >>= f
 \end{code}
 will get the name |Right (Left Start)|.
 
+Note that the Key monad laws from Figure \ref{laws} only hold for this implementation \emph{up to observation}. If we have access to the definition of Keys, we can discriminate between, for example, |m >> n| and |n|. However, in the interface |Key| is an abstract type, and thus users can be blissfully ignorant of this.
+
 A downside of this implementation is that |testEquality| is linear in the length of the tree paths. A more efficient implementation of the Key monad uses |Integer|s to represent keys and deals out unique names by unsafely reading and updating a mutable variable which is unsafely created in |runKey|. A full implementation of this version of the Key monad can be found in the code online.
 
 \subsection{The key indexed monad}
