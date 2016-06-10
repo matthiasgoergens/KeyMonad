@@ -708,7 +708,7 @@ phoasToBruijn :: (forall v. Phoas v a) -> Bruijn [] a
 \end{code} 
 This seems to be not only be impossible in Haskell without extensions, but in dependently typed languages without extensions as well. For example, when using |Phoas| in \emph{Coq} to prove properties about programming languages, a small extension to the logic in the form of a special well-scopedness axiom for the |Phoas| data type is needed to translate Phoas to de Bruijn indices\cite{phoas}.
 
-The well-scopedness of a |Bruijn| value follows from the fact that the value is well-typed. With |Phoas|, the well-scopedness relies on the meta-level (i.e. not formalized through types) argument that no ill-scoped values can be created using the |Phoas| interface. The internal (i.e. formalized through types) well-scopedness of |Bruijn|, allows interpretations of syntax which seem to not be possible if we are using terms constructed with |Phoas|. As an example of this, consider translating lambda terms to \emph{Cartesian closed category} combinators (the categorical version of the lambda calculus). This can be done if the lambda terms are given as |Bruijn| values, as demonstrated in Figure \ref{ccc}. Without the Key monad, there seem to be no way to do the same for terms constructed with the Phoas terms.
+The well-scopedness of a |Bruijn| value follows from the fact that the value is well-typed. With |Phoas|, the well-scopedness relies on the meta-level (i.e. not formalized through types) argument that no ill-scoped values can be created using the |Phoas| interface. The internal (i.e. formalized through types) well-scopedness of |Bruijn|, allows interpretations of syntax which seem to not be possible if we are using terms constructed with |Phoas|. As an example of this, consider translating lambda terms to \emph{Cartesian closed category} combinators (the categorical version of the lambda calculus), which is useful for translating lambda terms to hardware \cite{conalccc}. This can be done if the lambda terms are given as |Bruijn| values, as demonstrated in Figure \ref{ccc}. Without the Key monad, there seem to be no way to do the same for terms constructed with the Phoas terms, but with the |Key| monad we can for example first translate to de Bruijn indices and then to Cartesian closed categories. 
 
 Our implementation of |phoasToBruijn| works by first translating |Phoas| to the |KExp| from the previous subsection, and then translating that to typed de Bruijn indices. The first step in this translation is straightforwardly defined using the |Hoas| interface from the previous subsection: 
 \begin{code}
@@ -1092,7 +1092,7 @@ runKeyM :: (exists p. forall s. KeyIM s p a) -> a
 \end{code}
 These types are \emph{not} equivalent: the latter implies the former, but not the other way around. In the former, the type which is bound to |p| may depend on |s|, which cannot happen in the latter. 
 
-Let us take a look at what happens if we allow this coercion and |p| does depend on |s|, for example when we create a key of type |Key s (Key s Int)|. When the type |s| is now unified with the tree of types of the keys, it leads to \emph{cyclic} types:
+Let us take a look at what happens if we allow this coercion and |p| does depend on |s|, for example when we create a key of type |Key s (Key s Int)|. When the type |s| is now unified with the tree of types of the keys, it leads a \emph{cyclic} type:
 \begin{code}
 s ~ (Key s Int) :++: t
 \end{code} 
@@ -1111,9 +1111,7 @@ However, to use the implementation of |join| of |KeyIM|, we need the argument to
 \begin{code}
 exists p q. TNameSupply p s ->  TNameSupply q s -> a
 \end{code}
-Again, these two types are \emph{not} equivalent: the latter implies the former, but not the other way around. In general, |q| may depend on the value of |TNameSupply p s|. However, this is not the case in this implementation of |KeyM| because the name supply is abstract. Unfortunately, invariants like these are very hard to express in the type system.
-
-Also, when a computation creates a potentially infinite number of keys, will also lead to an \emph{infinite} type, which may again lead to type unsoundness.
+Again, these two types are \emph{not} equivalent: the latter implies the former, but not the other way around. In general, |q| may depend on the value of |TNameSupply p s|. However, this is not the case in this implementation of |KeyM| because the name supply and |Key| types are abstract and hence cannot influences the choice of type |q|. Unfortunately, invariants like these are very hard to express in the type system. Also, when a computation creates a potentially infinite number of keys, will also lead to an \emph{infinite} type, which may again lead to type unsoundness.
 
 \section{Discussion on the \st{} monad proof}
 \label{stdis}
