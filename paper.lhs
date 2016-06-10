@@ -437,7 +437,7 @@ a |KeyMap| to a value of type |x|. Hence we can be sure that
 arrow computations returning a |Cage| do not allow pattern-matching on the result,
 % we do not allow pattern matching on the result of an arrow
 % computation
-because the result is simply not available. In the usage of |Applicative| we saw earlier in the expression |(+) <$> x <*> y|, was using the |Applicative| instance of |Cage|s. 
+because the result is simply not available. In the usage of |Applicative| in the expression |(+) <$> x <*> y|  we saw earlier, uses the |Applicative| instance of |Cage|s. 
 
 In our construction, we use |Key|s as names, and |KeyMap|s as
 \emph{environments}, i.e. mappings from names to values.  Each result
