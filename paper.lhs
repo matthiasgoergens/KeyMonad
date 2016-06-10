@@ -464,6 +464,8 @@ newtype ArrowSyntax a s x =
 newtype EnvArrow a s = 
    EnvArrow (a (KeyMap s) (KeyMap s))
 \end{code}
+The type declaration for |EnvArrow| suggests that this approach would not have worked if we had used the \st{} monad instead of the Key monad; |KeyMap|s are used as inputs as well as outputs for general arrows, which needs |KeyMap|s to be tangible objects rather than hidden inside a monadic computation, as they are in the \st{} monad.
+
 Like any arrow from a type |x| to the same type, |EnvArrow|s form a monoid as follows:
 \begin{code}
 instance Arrow a => Monoid (EnvArrow a x) where
