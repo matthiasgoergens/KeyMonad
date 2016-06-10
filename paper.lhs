@@ -918,7 +918,7 @@ Second, we introduce two helper functions: |lam|, which takes a function over th
 
 Third, the fixpoint combinator takes a Haskell function |f|, wraps it onto the domain |D s a| resulting in a function |f'|, and then uses |lam| and |app| to construct a fixpoint combinator from the untyped lambda calculus. Lastly, we need to convert the result from the domain |D s a| back into Haskell-land using |unVal|.
 
-What this shows is that (1) adding the Key monad to a normalizing language may make it non-normalizing, (2) the Key monad is a genuine extension of Haskell without term-level recursion and type-level contravariant recursion. Incidentally, this is also the case for the \st{} monad. In a stratified type system with universe levels, such as Agda or Coq, it should be possible to omit this problem by making keys of a higher level than their associated types.
+What this shows is that (1) adding the Key monad to a normalizing language may make it non-normalizing, (2) the Key monad is a genuine extension of Haskell without term-level recursion and type-level contravariant recursion. Incidentally, this is also the case for the \st{} monad. In a stratified type system with universe levels, such as Agda or Coq, it should be possible to omit this problem by making keys of a higher level than their associated types. In Haskell, this would defeat the ``unconstrained'' part of the title of the paper; then we could just as well have used |Typeable|.
 
 \section{Implementing the Key monad}
 \label{impl}
