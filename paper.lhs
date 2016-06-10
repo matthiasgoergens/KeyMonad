@@ -246,6 +246,7 @@ This allows us to create an infinite list of |Key|s for example:
 newKeys :: KeyM s [Key s a]
 newKeys = liftM2 (:) newKey newKeys
 \end{code}
+This is something you can only do using |unsafeInterleaveST| in the \st{} monad.
 
 Why is the |testEquality| function for |STRef|s safe? The reason is that if two references are the same, then their types must also be the same. This invariant must already be true for \st{} references, because otherwise we could have two references pointing to the same location with different types. Writing to one reference and then reading from the other would coerce the value from one type to another! Hence, the Key monad  splits reasoning based on this invariant into a separate interface and makes it available to the user via |testEquality|.
 
@@ -371,7 +372,7 @@ In this section, we show that the Key monad gives us the power to implement an \
 
 \subsection{Arrows vs Monads}
 
-The |Arrow| type class, shown in Figure~\ref{arrowsdef}, was introduced by Hughes~\cite{arrows} as an interface that is like monads, but which allows for more static information about the constructed computations to be extracted. However, in contrast to monads, arrows do not directly allow intermediate values to be \emph{named}; instead, expressions must be written in \emph{point-free style}. 
+The |Arrow| type class, shown in Fig.\ \ref{arrowsdef}, was introduced by Hughes \cite{arrows} as an interface that is like monads, but which allows for more static information about the constructed computations to be extracted. However, in contrast to monads, arrows do not directly allow intermediate values to be \emph{named}; instead, expressions must be written in \emph{point-free style}. 
 
 As an example, an arrow computation which feeds the same input to two arrows, and adds their outputs, can be expressed in point-free style as follows:
 \begin{code}
