@@ -161,6 +161,10 @@ unlock k (Lock k' x) =
 \end{code}
 If we used the right key, we get |Just| the value in the box, and we get |Nothing| otherwise.
 
+Note that the only way to unlock a |Box| successfully involves using the |Key| that was used to create it, not merely a |Key| with the right type. The function |testEquality| only returns |Just Refl| when the keys are identical, not when the types are the same. Thus, the Key monad does not provide a means of checking type equality at run-time.
+
+\subsection{Heterogeneous maps}
+
 We can use |Box|es to create a kind of \emph{heterogeneous maps}: a data structure that that maps keys to values of the type corresponding to the key. The interesting feature here is that the type of these heterogenous maps does not depend on the types of the values that are stored in it, nor do the functions have |Typeable| constraints. We can implement such maps straightforwardly as follows\footnote{For simplicity, this is a rather inefficient implementation, but a more efficient implementation (using |IntMap|s) can be given if we add a function |hashKey :: Key s a -> Int| to the Key monad.}:
 \begin{code}
 newtype KeyMap s = KM [Box s]
