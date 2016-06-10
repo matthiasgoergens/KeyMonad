@@ -1051,43 +1051,43 @@ A typed name supply of type |TNameSupply l s| gives unique names for the types i
 
 By using the typed name supply instead of the regular name supply and altering the types in the interface to reflect this change, we obtain an implementation of what we call the \emph{indexed} Key monad, with the following interface:
 \begin{code}
-newKeyIm        ::  KeyIm s (Single a) (Key s a)
+newKeyIM        ::  KeyIM s (Single a) (Key s a)
 
-rreturn        ::  a -> KeyIm Empty s a
-(.>>=)        ::  KeyIm s l a -> (a -> KeyIm s r b) 
-                  -> KeyIm s (l :++: r) b
+rreturn         ::  a -> KeyIM Empty s a
+(.>>=)          ::  KeyIM s l a -> (a -> KeyIM s r b) 
+                     -> KeyIm s (l :++: r) b
 
-runKeyIm      :: (forall s. KeyIm s l a) -> a
+runKeyIM        :: (forall s. KeyIM s l a) -> a
 
-testEquality  ::  Key s a -> Key s b -> Maybe (a :~: b)
+testEquality    ::  Key s a -> Key s b -> Maybe (a :~: b)
 \end{code}
 The implementation of this interface is completely analogous to the implementation of the Key monad in the previous subsection. The only difference is that |testEquality| now uses |sameName|, omitting the need for |unsafeCoerce|.
 This interface is an instance of the \emph{parametric effect monad} type class\cite{peff}. 
 
 Note that in the implementation |runKeyIm| now uses the universally quantified type variable to |s| to unifiy |s| with |l|, to use |newTNameSupply|. This ``closes the context'', stating that the context is precisely the types which are created in the computation. In contrast, in |runKeyM| the type variable was not given an interpretation.
 
-While we have succeeded in avoiding |unsafeCoerce|, this construction is \emph{less powerful} than the regular key monad because the types of the keys which are going to be created must now be \emph{statically known}. All example use cases of the key monad in this paper rely on the fact that the type of the keys which are going to be created do not have to be statically know. For example, we cannot implement a translation from parametric \hoas{} to de Bruijn indices with |KeyIm|, because the type of the keys which will have to be created is precisely the information that a parametric \hoas{} representation lacks.
+While we have succeeded in avoiding |unsafeCoerce|, this construction is \emph{less powerful} than the regular Key monad because the types of the keys which are going to be created must now be \emph{statically known}. All example use cases of the Key monad in this paper rely on the fact that the type of the keys which are going to be created do not have to be statically know. For example, we cannot implement a translation from parametric \hoas{} to de Bruijn indices with |KeyIM|, because the type of the keys which will have to be created is precisely the information that a parametric \hoas{} representation lacks.
 
 \subsection{Attempting to recover the Key monad}
 
-Can we formalize the invariant through types and provide the regular Key monad interface? An obvious attempt at this is hiding the extra type of |KeyIm|:
+Can we formalize the invariant through types and provide the regular Key monad interface? An obvious attempt at this is hiding the extra type of |KeyIM|:
 \begin{code}
 data KeyM s a where
-  KeyM :: KeyIm s p a -> KeyM s a
+  KeyM :: KeyIM s p a -> KeyM s a
 \end{code}
-We denote this type by |exists p. KeyIm s p a| for presentational purposes, which is not valid (\ghc{}) Haskell. While this allows us to provide type-safe implementations of |testEquality|, |fmap|, |newKey| and |return|, things go awry for |join| (or |>>=|) and |runKeyM|.
+We denote this type by |exists p. KeyIM s p a| for presentational purposes, although it is not valid Haskell. While this allows us to provide type-safe implementations of |testEquality|, |fmap|, |newKey| and |return|, things go awry for |join| (or |>>=|) and |runKeyM|.
 
-The first problem arises at |runKeyM|. We get the type:
+Here is the problem that arises for |runKeyM|. We get the type:
 \begin{code}
-runKeyM :: (forall s. exists p. KeyIm s p a) -> a
+runKeyM :: (forall s. exists p. KeyIM s p a) -> a
 \end{code}
-But to use |runKeyIm| the type should be:
+But to use |runKeyIM| the type should be:
 \begin{code}
-runKeyM :: (exists p. forall s. KeyIm s p a) -> a
+runKeyM :: (exists p. forall s. KeyIM s p a) -> a
 \end{code}
 These types are \emph{not} equivalent: the latter implies the former, but not the other way around. In the former, the type which is bound to |p| may depend on |s|, which cannot happen in the latter. 
 
- If the types of all keys which are created do not mention |s|, we do not for example create a key of type |Key s (Key s a)|, then one could argue that coercing the computation from the former to the latter is perfectly safe. However, if we create a key of type |Key s (Key s Int)|, then when the type |s| is unified with the tree of types of the keys, this leads to \emph{cyclic} types. For example:
+If the types of all keys which are created do not mention |s|, we do not for example create a key of type |Key s (Key s a)|, then one could argue that coercing the computation from the former to the latter is perfectly safe. However, if we create a key of type |Key s (Key s Int)|, then when the type |s| is unified with the tree of types of the keys, this leads to \emph{cyclic} types. For example:
 \begin{code}
 s ~ (Key s Int) :++: t
 \end{code} 
