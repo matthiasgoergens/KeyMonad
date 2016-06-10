@@ -405,7 +405,7 @@ addA f g = proc $ \z -> do
     y <- g -< z
     return $ (+) <$> x <*> y
 \end{code}
-We use a function conveniently called |proc| and use an infix function conveniently called |(-<)|.
+We use a function conveniently called |proc| and use an infix function conveniently called |(-<)|. Slightly less nice is that we now have to use the |Applicative| interface to combine values resulting from arrow computations: we have to write |(+) <$> x <*> y| instead of |x + y|. Note that |proc| is a \emph{function}, which does all the plumbing to rewrite the syntax to a point-free expression which is normally done in a compiler pass.
 
 The difference between |do| notation and arrow notation is that in arrow notation, one cannot observe intermediate values to decide what to do next. For example, we \emph{cannot} do the following:
 \begin{code}
@@ -418,9 +418,9 @@ ifArrow t f = procb z -> do
 Allowing this kind of behavior would make it impossible to translate arrow notation to arrow expressions, because this is exactly the power that monads have but that arrows lack \cite{idiomarrmonad}. To mimic this restriction in our embedded arrow notation, our function |(-<)| has the following type:
 \begin{code}
 (-<) :: Arrow a => a x y -> Cage s x -> 
-              ArrowSyn s (Cage s y)
+              ArrowSyntax s (Cage s y)
 \end{code}
-The type |ArrowSyn| is the monad which we use to define our embedded
+The type |ArrowSyntax| is the monad which we use to define our embedded
 arrow notation. The input and output of the arrow computations are
 enclosed in |Cage|s, a type which disallows observation of the value of type |x| it ``contains''. 
 
@@ -437,7 +437,7 @@ a |KeyMap| to a value of type |x|. Hence we can be sure that
 arrow computations returning a |Cage| do not allow pattern-matching on the result,
 % we do not allow pattern matching on the result of an arrow
 % computation
-because the result is simply not available.
+because the result is simply not available. In the usage of |Applicative| we saw earlier in the expression |(+) <$> x <*> y|, was using the |Applicative| instance of |Cage|s. 
 
 In our construction, we use |Key|s as names, and |KeyMap|s as
 \emph{environments}, i.e. mappings from names to values.  Each result
@@ -449,26 +449,24 @@ conjunction with |KeyMap|s allows us to model \emph{heterogeneous} environments 
 By using |(-<)| and the monad interface, we can construct the syntax for the arrow computation that we are expressing. Afterwards, we use the following function to convert the syntax to an arrow:
 \begin{code}
 proc ::  Arrow a => 
-         (forall s. Cage s x -> ArrowSyn a s (Cage s y)) 
-         -> a x y
+      (forall s. Cage s x -> ArrowSyntax a s (Cage s y)) 
+      -> a x y
 \end{code}
 
-Internally, the |ArrowSyn| monad builds an \emph{environment arrow}, an arrow from environment to environment, i.e. an arrow of type |a (KeyMap s) (KeyMap s)|. The |ArrowSyn| monad creates names for values in these environments using |KeyM|.
+Internally, the |ArrowSyntax| monad builds an \emph{environment arrow}, an arrow from environment to environment, i.e. an arrow of type |a (KeyMap s) (KeyMap s)|. The |ArrowSyntax| monad creates names for values in these environments using |KeyM|.
 \begin{code}
-newtype ArrowSyn a s x =
+newtype ArrowSyntax a s x =
     AS (WriterT (EnvArrow a s) (KeyM s) x)
        deriving (Functor,Applicative,Monad)
-type EnvArrow a s = EndoA a (KeyMap s)
+newtype EnvArrow a s = 
+   EnvArrow (a (KeyMap s) (KeyMap s))
 \end{code}
-The type |EndoA a x| is isomorphic to an arrow from a type |x| to the same type:
+Like any arrow from a type |x| to the same type, |EnvArrow|s form a monoid as follows:
 \begin{code}
-newtype EndoA a x = EndoA (a x x)
-\end{code}
-Such arrows form a monoid as follows:
-\begin{code}
-instance Arrow a => Monoid (EndoA a x) where
-    mempty = EndoA (arr id)
-    mappend (EndoA l) (EndoA r) = EndoA (l >>> r)
+instance Arrow a => Monoid (EnvArrow a x) where
+    mempty = EnvArrow (arr id)
+    mappend (EnvArrow l) (EnvArrow r) = 
+         EnvArrow (l >>> r)
 \end{code}
 The standard writer monad transformer, |WriterT|, produces |mempty| for |return|, and composes the built values from from the left and right hand side of |>>=| using |mappend|, giving us precisely what we need for building arrows. 
 
@@ -507,9 +505,9 @@ withEnv c = dup >>> first (elimEnv c)
 With these auxiliary arrows, we can define functions that convert back and forth between a regular arrow and an environment arrow. To implement |(-<)|, we need to convert a regular arrow to an environment arrow, for which we need an expression for the input to the arrow, and a name for the output of the arrow:
 \begin{code}
 toEnvArrow ::  Arrow a =>  
-           Cage s x  -> Key s y   -> 
+           Cage s x  -> Key s y -> 
            a x y -> EnvArrow a s
-toEnvArrow inC outK a  = EndoA $ 
+toEnvArrow inC outK a  = EnvArrow $ 
    withEnv inC >>> first a >>> extendEnv outK
 \end{code}
 We first produce the input to the argument arrow, by interpreting the input expression using the input environment. We then execute the argument arrow, and bind its output to the given name to obtain the output environment. 
@@ -518,7 +516,7 @@ The |-<| operation gets the arrow and the input expression as an argument, creat
 \begin{code}
 (-<) :: Arrow a =>
         a x y ->
-        (Cage s x -> ArrowSyn a s (Cage s y))
+        (Cage s x -> ArrowSyntax a s (Cage s y))
 a -< inC = AS $
    do  outK <- lift newKey
        tell (toEnvArrow inC outK a)
@@ -528,9 +526,9 @@ a -< inC = AS $
 In the other direction, to implement |proc| we need to convert an environment arrow to a regular arrow, for which we instead need the name of the input and an expression for the output:
 \begin{code}
 fromEnvArrow ::  Arrow a =>
-             Key s x   -> Cage s y  ->
+             Key s x   -> Cage s y ->
              EnvArrow a s -> a x y
-fromEnvArrow inK outC (EndoA a)  =
+fromEnvArrow inK outC (EnvArrow a)  =
    introEnv inK >>> a >>> elimEnv outC
 \end{code}
 We first bind the input to the given name to obtain the input environment. We then transform this environment to the output environment by running the arrow from environment to environment. Finally, we interpret the output expression in the output environment to obtain the output.
@@ -538,8 +536,8 @@ We first bind the input to the given name to obtain the input environment. We th
 The |proc| operation creates a name for the input and passes it to the function as an expression to obtain the output expression and the environment arrow. We then convert the obtained arrow from environment to environment using |fromEnvArrow|:
 \begin{code}
 proc ::  Arrow a =>
-             (forall s. Cage s x -> ArrowSyn a s (Cage s y)) ->
-             a x y
+    (forall s. Cage s x -> ArrowSyntax a s (Cage s y)) ->
+    a x y
 proc f = runKeyM $
       do  inK <- newKey
           let AS m = f (toCage inK)
@@ -551,45 +549,47 @@ proc f = runKeyM $
 
 Altenkirch, Chapman and Uustalu\cite{relmonad} show a related construction: in category theory arrows are a special case of \emph{relative monads}, which are themselves a generalization of monads. In Haskell, a relative monad is an instance of the following type class:
 \begin{code}
-class RelativeM m v where
+class RelativeMonad m v where
   rreturn  :: v x -> m x
   (.>>=)   :: m x -> (v x -> m y) -> m y
 \end{code}
 The only difference with regular monads is that the values resulting from computations must be wrapped in a type constructor |v|, instead of being ``bare''. The relative monad laws are also the same as the regular (Haskell) monad laws.
 The construction of Altenkirch et al. which shows that arrows are an instance of relative monads is not a relative monad in Haskell, only in category theory. In particular their construction uses the Yoneda embedding, which does not allow us freely use bound values, instead it requires us to manually lift values into scope, in the same fashion as directly using de Bruijn indices. 
 
-Because all the operations in |ArrowSyn| (namely |(-<)|) return a |Cage|, it might be more informative to see it as a relative monad, i.e.:
+Because all the operations in |ArrowSyntax| (namely |(-<)|) return a |Cage|, it might be more informative to see it as a relative monad, i.e.:
 \begin{code}
 data ArrowRm a s x = ArrowRm 
-         (ArrowSyn a s (Cage s x))
-instance RelativeM (ArrowRm a s) (Cage s) where ...
+         (ArrowSyntax a s (Cage s x))
+instance RelativeMonad (ArrowRm a s) (Cage s) 
 
 (-<) :: a x y -> Cage s x -> ArrowRm a s y
 proc :: (forall a. Cage s x -> ArrowRm a s y) -> a x y
 \end{code}
 In this formulation, it is clear that the user cannot decide what to do next based on the outcome of a computation: all we can get from a computation is |Cage|s. 
-The monadic interface does not add extra power: while we cannot decide what to do next based on the output of a computation of type |ArrowSyn s (Cage s x)|, we can, for example, decide what to next based on the outcome of a computation of type |ArrowSyn s Int|. This does not give our embedded arrow notation more power than regular arrow notation or the relative monad interface: the value of the integer cannot depend on the result of an arrow computation and hence must be the result of a pure computation. This essentially the same trick as described in Svenningsson and Svensson\cite{bjorn}. 
+The monadic interface does not add extra power: while we cannot decide what to do next based on the output of a computation of type |ArrowSyntax s (Cage s x)|, we can, for example, decide what to next based on the outcome of a computation of type |ArrowSyntax s Int|. This does not give our embedded arrow notation more power than regular arrow notation or the relative monad interface: the value of the integer cannot depend on the result of an arrow computation and hence must be the result of a pure computation. This essentially the same trick as described in Svenningsson and Svensson\cite{bjorn}. 
 
 As an aside, more generally, this trick can be used to give a monadic interface for \emph{any} relative monad:
 \begin{code}
-data RmM rm v a where
-   Pure :: a -> RmM rm v a
-   Unpure ::  rm a -> (v a -> RmM rm v b) 
-              -> RmM rm v b
+data RelativeMSyntax rm v a where
+   Pure :: a -> RelativeMSyntax rm v a
+   Unpure ::  rm a -> (v a -> RelativeMSyntax rm v b) 
+              -> RelativeMSyntax rm v b
 
-instance Monad (RmM rm v) where
+instance Monad (RelativeMSyntax rm v) where
   return = Pure
   (Pure x) >>= f = f x
   (Unpure m f) >>= g = Unpure m (\x -> f x >>= g)
 
-fromRm :: RelativeM rm v => rm a -> RmM rm v (v a)
-fromRm m = Unpure m (return)
+fromRelativeM :: RelativeMonad rm v => 
+   rm a -> RelativeMSyntax rm v (v a)
+fromRelativeM m = Unpure m return
 
-toRm :: RelativeM rm v => RmM rm v (v a) -> rm a
-toRm (Pure x)      = rreturn x
-toRm (Unpure m f)  = m .>>= (toRm :. f)
+toRelativeM :: RelativeMonad rm v =>
+                  RelativeMSyntax rm v (v a) -> rm a
+toRelativeM (Pure x)      = rreturn x
+toRelativeM (Unpure m f)  = m .>>= (toRelativeM :. f)
 \end{code}
-The insight is because a computation monad must eventually return a value of |v a| to convert a relative monad computation via |toRm|, any pure value that is used, can eventually be removed via the monad law |return x >>= f == f x|. Our embedded arrow construction can be seen as relative monad, where we apply this trick to obtain a monadic interface.
+The insight is because a computation must eventually return a value of |v a| to convert a relative monad computation via |toRelativeM|, any pure value that is used, can eventually be removed via the monad law |return x >>= f == f x|. Our embedded arrow construction can be seen as relative monad, where we apply this trick to obtain a monadic interface.
 
 Our construction hence suggests that arrows are also a special case of relative monad in Haskell with the key monad, but a formal proof (using the Key monad laws from Figure (\ref{laws})) is outside the scope of this paper. In the code online, we also show that this construction can be extended to use \emph{relative monadfix} (with function  |rmfix :: (v a -> m a) -> m a|) to construct arrows using |ArrowLoop|, but the we cannot use recursive monad notation in this case, because the above trick does not extend to Monadfix.
 
