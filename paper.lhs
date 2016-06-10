@@ -70,9 +70,9 @@
   parametric \hoas{} to typed de Bruijn indices, among others. Although strongly
   related to the \st{} monad, the Key monad is simpler and might be 
   easier to prove safe. We do not provide such a proof of the safety of the Key monad, but we note that, surprisingly, a full proof of the safety of
-  the \st{} monad remains elusive to this day. Hence, another reason for
+  the \st{} monad also remains elusive to this day. Hence, another reason for
   studying the Key monad is that a safety proof for it might
-  be a stepping stone towards a safety proof of the \st{} monad as well.
+  be a stepping stone towards a safety proof of the \st{} monad.
 \end{abstract}
 
 
