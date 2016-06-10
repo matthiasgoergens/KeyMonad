@@ -70,9 +70,9 @@
   parametric \hoas{} to typed de Bruijn indices, among others. Although strongly
   related to the \st{} monad, the Key monad is simpler and might be 
   easier to prove safe. We do not provide such a proof of the safety of the Key monad, but we note that, surprisingly, a full proof of the safety of
-  the \st{} monad remains elusive to this day. Hence, another reason for
+  the \st{} monad also remains elusive to this day. Hence, another reason for
   studying the Key monad is that a safety proof for it might
-  be a stepping stone towards a safety proof of the \st{} monad as well.
+  be a stepping stone towards a safety proof of the \st{} monad.
 \end{abstract}
 
 
@@ -107,22 +107,23 @@ The only new feature is the function |testEquality|, which compares two keys for
 
 
 
-Why is the Key monad interesting? There are two separate reasons.
+Why is the Key monad interesting? There are three separate reasons.
 
 First, the Key monad embodies the insight that when two Keys are the same then their types must be the same, and makes reasoning based on this available to the user via |testEquality|. This makes the Key monad applicable in situations where the \st{} monad would not have been suitable. In fact, the bulk of this paper presents examples of uses of the Key monad that would have been impossible without |testEquality|.
 
 Second, the Key monad is simpler than the \st{} monad, because it does not involve global references, or any updatable state at all. We would like to argue that therefore, the Key monad is easier to understand than the \st{} monad. Moreover, given the Key monad, the \st{} monad is actually implementable in plain Haskell, albeit in a less time- and memory-efficient way than the original \st{} monad (that is, missing feature (1) above, but still providing features (2) and (3)).
-The second reason comes with a possibly unexpected twist.
+
+This second reason comes with a possibly unexpected twist.
 
 After its introduction in 1994, several papers have claimed to establish the safety, fully or partially, of the \st{} monad in Haskell \cite{stmonad,LaunchburySabry,AriolaSabry,MoggiSabry}. By safety we mean three things: (a) type safety (programs using the \st{} monad are still type safe), (b) referential transparency (programs using the \st{} monad are still referentially transparent), and (c) abstraction safety (programs using the \st{} monad still obey the parametricity theorem). It came as a complete surprise to the authors that {\em none of the papers we came across in our literature study actually establishes the safety of the \st{} monad in Haskell!}
 
-So, there is a third reason for studying the Key monad: A safety proof for the Key monad could be much simpler than a safety proof for the \st{} monad. The existence of such a proof would conceivably lead to a safety proof of the \st{} monad as well; in fact this is the route that we would currently recommend for anyone trying to prove the \st{} monad safe.
+So, there is a third reason for studying the Key monad: A safety proof for the Key monad could be simpler than a safety proof for the \st{} monad. The existence of such a proof would conceivably lead to a safety proof of the \st{} monad as well; in fact this is the route that we would currently recommend for anyone trying to prove the \st{} monad safe.
 
 This paper does not provide a formal safety proof of the Key monad. Instead, we will argue that the safety of the Key monad is just as plausible as the safety of the \st{} monad. We hope that the reader will not hold it against us that we do not provide a safety proof. Instead, we would like this paper to double as a call to arms, to find (ideally, mechanized) proofs of safety of both the Key monad and the \st{} monad!
 
 Our contributions are as follows:
 \begin{itemize}
-\item We present the Key monad (Section \ref{keym}) and argue for its safety (Section \ref{safety}).
+\item We present the Key monad (Section \ref{keym}) and informally argue for its safety (Section \ref{safety}).
 \item We show that the added power of the Key monad allows us to do things we cannot do without it, namely it allows us
      \begin{itemize}
           \item to implement the \st{} monad (Section \ref{keym});
@@ -130,7 +131,7 @@ Our contributions are as follows:
           \item to represent typed variables in typed representations of syntax (Section \ref{syntax});
           \item to translate parametric \hoas{} to nested de Bruijn indices, which allows interpretations of parametric \hoas{} terms, such as translation to Cartesian closed categories, which are not possible otherwise (Section \ref{syntax}).
 \end{itemize}
-\item We present an argument why the Key monad is not expressible in Haskell (without |unsafeCoerce|) (Section \ref{impl}).
+\item We present an informal argument why the Key monad is not expressible in Haskell (without |unsafeCoerce|) (Section \ref{impl}).
 \end{itemize}
 We discuss the state of the proof of the safety of the \st{} monad in section \ref{stdis} and we conclude in Section \ref{conc}.\\[0.05cm]
 
@@ -160,20 +161,24 @@ unlock k (Lock k' x) =
 \end{code}
 If we used the right key, we get |Just| the value in the box, and we get |Nothing| otherwise.
 
-We can use |Box|es to create a kind of \emph{heterogeneous maps}: a data structure that that maps keys to values of the type corresponding to the key. The interesting feature here is that the type of these heterogenous maps does not depend on the types of the values that are stored in it, nor do the functions have |Typeable| constraints. We can implement such maps straightforwardly as follows\footnote{For simplicity, this is a rather inefficient implementation, but a more efficient implementation (using |IntMap|s) can be given if we add a slightly unsafe function |hashKey :: Key s a -> Int| to the Key monad.}:
+Note that the only way to unlock a |Box| successfully involves using the |Key| that was used to create it, not merely a |Key| with the right type. The function |testEquality| only returns |Just Refl| when the keys are identical, not when the types are the same. Thus, the Key monad does not provide a means of checking type equality at run-time.
+
+\subsection{Heterogeneous maps}
+
+We can use |Box|es to create a kind of \emph{heterogeneous maps}: a data structure that that maps keys to values of the type corresponding to the key. The interesting feature here is that the type of these heterogenous maps does not depend on the types of the values that are stored in it, nor do the functions have |Typeable| constraints. We can implement such maps straightforwardly as follows\footnote{For simplicity, this is a rather inefficient implementation, but a more efficient implementation (using |IntMap|s) can be given if we add a function |hashKey :: Key s a -> Int| to the Key monad.}:
 \begin{code}
-newtype KeyMap s = Km [Box s]
+newtype KeyMap s = KM [Box s]
 
 empty :: KeyMap s
-empty = Km []
+empty = KM []
 
 insert :: Key s a -> a -> KeyMap s -> KeyMap s
-insert k v (Km l) = Km (Lock k v : l)	
+insert k v (KM l) = KM (Lock k v : l)	
 
 lookup :: Key s a -> KeyMap s -> Maybe a
-lookup k (Km [])       = Nothing
-lookup k (Km (h : t))  = 
-  unlock k h `mplus` lookup k (Km t)
+lookup k (KM [])       = Nothing
+lookup k (KM (h : t))  = 
+  unlock k h `mplus` lookup k (KM t)
 
 (!) :: KeyMap s -> Key s a -> a
 m ! k = fromJust (lookup k m)
@@ -742,7 +747,7 @@ instance PFunctor (FBox s) where
   pfmap f (FLock k x) = FLock k (f x)
 \end{code} We also need a variant of the |KeyMap|, where we store |FBox|es instead of regular boxes:
 \begin{code}
-newtype FKeyMap s f = FKm [FBox s f]
+newtype FKeyMap s f = FKM [FBox s f]
 insert :: Key s a -> f a -> FKeyMap s f  -> FKeyMap s f
 lookup :: Key s a -> FKeyMap s f -> Maybe (f a)
 instance PFunctor (FKeyMap s)
