@@ -204,7 +204,7 @@ newSTRef v = ST $
       modify (insert k v)
       return k
 
-readSTRef :: STRef s   a -> ST s a
+readSTRef :: STRef s a -> ST s a
 readSTRef r = ST $ (getr) <$> get
 
 writeSTRef :: STRef s a -> a -> ST s ()
