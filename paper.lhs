@@ -237,7 +237,7 @@ Note that with the above |testEquality| function for |STRef|s it is possible to 
 (runST $ undefined >> newSTRef 4 >>= 
   \x -> return (testEquality x x)) == undefined
 \end{code}
-For the Key monad the following holds, as specified by the Key monad laws in Section \ref{laws}:
+For the Key monad the following holds, as specified by the Key monad laws in Section \ref{seclaws}:
 \begin{code}
 (runKeyM $ undefined >> newKey >>=
    \x -> return (testEquality x x)) == Just Refl
@@ -283,7 +283,7 @@ newSTRef :: Typeable a => a -> ST s (STRef s a)
 In fact, all example usages of the Key monad in this paper can also be implemented by using |Typeable| and unique numbers and adding constraints to the user interface. We could even implement the Key monad itself by adding a |Typeable| constraint to |newKey|. However, using the Key monad has the benefit that it is \emph{unconstrained}: we can use it even when |Typeable| dictionaries are unavailable.
 
 \subsection{Key monad laws}
-\label{laws}
+\label{seclaws}
 Informally, the Key monad allows us to create new keys and compare them, maybe obtaining a proof of the equality of their associated types. To give a more precise specification and to allow equational reasoning, we also present the Key monad laws shown in Figure \ref{laws}, which we will now briefly discuss. 
 
 \begin{figure}
