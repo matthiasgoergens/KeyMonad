@@ -641,7 +641,9 @@ instance Hoas (HoasKey s) where
          return (KLam k b)
   app f x  = HK $ KApp <$> getExp f <*> getExp x 
 \end{code}
-For instance, the lambda term |(\x y -> x)| can now be constructed with: |lam (\x -> lam (\y -> x))|
+For instance, the lambda term |(\x y -> x)| can now be constructed with: |lam (\x -> lam (\y -> x))|.
+
+Note that we only need the Key monad to {\em create} keys. Once we have created the necessary keys, we can stay fully within normal, non-monadic Haskell. The above example can also be done with the \st{} monad (using |STRef|s as names), but we would have to perform every computation that would do something with these names (for example an interpreter) inside the \st{} monad.
 
 \subsection{Translating well-scoped representations}
 
