@@ -1095,14 +1095,14 @@ In the previous section, we demonstrated that allowing such keys, where the type
 
 For |join| other problems arise. We need a implementation of type:
 \begin{code}
-join ::  (exists p. KeyIm s p (exists q. KeyIm s q a)) -> 
-         exists r. KeyIm s r a
+join ::  (exists p. KeyIM s p (exists q. KeyIM s q a)) -> 
+         exists r. KeyIM s r a
 \end{code}
-Expanding the definition of |KeyIm|, the type of the \emph{argument} we have is:
+Expanding the definition of |KeyIM|, the type of the \emph{argument} we have is:
 \begin{code}
 exists p. TNameSupply p s -> exists q. TNameSupply q s -> a
 \end{code} 
-However, to use the implementation of |join| of |KeyIm|, we need the argument to be of type:
+However, to use the implementation of |join| of |KeyIM|, we need the argument to be of type:
 \begin{code}
 exists p q. TNameSupply p s ->  TNameSupply q s -> a
 \end{code}
