@@ -749,12 +749,13 @@ instance PFunctor (FBox s) where
 \end{code} We also need a variant of the |KeyMap|, where we store |FBox|es instead of regular boxes:
 \begin{code}
 newtype FKeyMap s f = FKM [FBox s f]
-insert :: Key s a -> f a -> FKeyMap s f  -> FKeyMap s f
-lookup :: Key s a -> FKeyMap s f -> Maybe (f a)
+empty   :: FKeyMap s f
+insert  :: Key s a -> f a -> FKeyMap s f  -> FKeyMap s f
+lookup  :: Key s a -> FKeyMap s f -> Maybe (f a)
 instance PFunctor (FKeyMap s)
 \end{code}
 
-To translate to de Bruijn indices, we store the current ``environment'' as a |FKeyMap| mapping each |Key| to an |Index| in the current environment. When we enter a lambda-body, we need to extend the environment: we add a mapping of the new variable to the de Bruijn index |Head|, and add one lookup step to each other de Bruijn index currently in the |FKeyMap|. This is be done as follows:
+To translate to de Bruijn indices, we store the current ``environment'' as an |FKeyMap| mapping each |Key| to an |Index| in the current environment. When we enter a lambda-body, we need to extend the environment: we add a mapping of the new variable to the de Bruijn index |Head|, and add one lookup step to each other de Bruijn index currently in the |FKeyMap|. This is be done as follows:
 \begin{code}
 extend :: Key s h -> FKeyMap s (Index t) ->
             FKeyMap s (Index (h : t))
