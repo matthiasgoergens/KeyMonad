@@ -18,6 +18,7 @@
 \newcommand{\app}{\mathbin{<\!\!\!\!\mkern1.4mu\raisebox{-1.55pt}{\scalebox{0.9}{*}}\mkern1.4mu\!\!\!\!>}}
 \newcommand{\aplus}{\mathbin{<\!\!\!\!\mkern1.4mu +\mkern1.4mu\!\!\!\!>}}
 \newcommand{\fmap}{\mathbin{<\!\!\!\mkern-0.4mu\raisebox{0.0pt}{\scalebox{0.8}{\$}}\mkern-0.4mu\!\!\!>}}
+%format § =  "\;"
 %format :~: =  ":\sim:"
 %format :++: =  ":\!\!+\!\!\!+\!\!:"
 %format `Sub` = "\subseteq"
@@ -219,7 +220,7 @@ runST m = runKeyM $ case m of
 
 \subsection{Relation with the \st{} monad}
 
-Note that while the Key monad can be used to implement the \st{} monad, the converse is not true. The problem is that there is no function:
+While the Key monad can be used to implement the \st{} monad, the converse is not true. The problem is that there is no function:
 \begin{code}
 testEquality ::  STRef s a -> STRef s b -> 
                  Maybe (a :~: b)
@@ -232,19 +233,21 @@ testEquality x y
 \end{code}
 The |unsafeCoerce| in |x == unsafeCoerce y| is needed because the types of the references might not be the same. Hence, another way to think of this paper is that we claim that the above function is \emph{safe}, that this allows us to do things which we could not do before, and that we propose this as an extension of the \st{} monad library. 
 
-Note that with the above |testEquality| function for |STRef|s it is possible to implement something similar to Key monad, but the Key monad is more lazy. In particular, using the above implementation of |testEquality|, following holds for the (lazy) \st{} monad:
+With the above |testEquality| function for |STRef|s it is possible to implement something similar to the Key monad, but the Key monad is more lazy. In particular, even for the lazy \st{} monad, the following holds:
 \begin{code} 
-(runST $ undefined >> newSTRef 4 >>= 
-  \x -> return (testEquality x x)) == undefined
+undefined >> m § == § undefined
 \end{code}
-For the Key monad the following holds, as specified by the Key monad laws in Section \ref{seclaws}:
+whereas for the Key monad (as we shall see in Sect.\ \ref{seclaws}), we have:
+\begin{code} 
+undefined >> m § == § m
+\end{code}
+This allows us to create an infinite list of |Key|s for example:
 \begin{code}
-(runKeyM $ undefined >> newKey >>=
-   \x -> return (testEquality x x)) == Just Refl
+newKeys :: KeyM s [Key s a]
+newKeys = liftM2 (:) newKey newKeys
 \end{code}
 
 Why is the |testEquality| function for |STRef|s safe? The reason is that if two references are the same, then their types must also be the same. This invariant must already be true for \st{} references, because otherwise we could have two references pointing to the same location with different types. Writing to one reference and then reading from the other would coerce the value from one type to another! Hence, the Key monad  splits reasoning based on this invariant into a separate interface and makes it available to the user via |testEquality|.
-
 
 In the same line of reasoning, it is already possible to implement a similar, but weaker, version of |testEquality| using only the standard \st{} monad functions. If we represent keys of type |Key s a| as a pair of an identifier and an |STRef| containing values of type |a|, then we can create a function that casts a value of type |a| to |b|, albeit monadically, i.e. we get a monadic cast function |a -> ST s b| instead of a proof |a :~: b|:
 \begin{code}
