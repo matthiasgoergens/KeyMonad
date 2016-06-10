@@ -561,12 +561,12 @@ The construction of Altenkirch et al. which shows that arrows are an instance of
 
 Because all the operations in |ArrowSyntax| (namely |(-<)|) return a |Cage|, it might be more informative to see it as a relative monad, i.e.:
 \begin{code}
-data ArrowRm a s x = ArrowRm 
+data ArrowRM a s x = ArrowRM 
          (ArrowSyntax a s (Cage s x))
-instance RelativeMonad (ArrowRm a s) (Cage s) 
+instance RelativeMonad (ArrowRM a s) (Cage s) 
 
-(-<) :: a x y -> Cage s x -> ArrowRm a s y
-proc :: (forall a. Cage s x -> ArrowRm a s y) -> a x y
+(-<) :: a x y -> Cage s x -> ArrowRM a s y
+proc :: (forall a. Cage s x -> ArrowRM a s y) -> a x y
 \end{code}
 In this formulation, it is clear that the user cannot decide what to do next based on the outcome of a computation: all we can get from a computation is |Cage|s. 
 The monadic interface does not add extra power: while we cannot decide what to do next based on the output of a computation of type |ArrowSyntax s (Cage s x)|, we can, for example, decide what to next based on the outcome of a computation of type |ArrowSyntax s Int|. This does not give our embedded arrow notation more power than regular arrow notation or the relative monad interface: the value of the integer cannot depend on the result of an arrow computation and hence must be the result of a pure computation. This essentially the same trick as described in Svenningsson and Svensson\cite{bjorn}. 
