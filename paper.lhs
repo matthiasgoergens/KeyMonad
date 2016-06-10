@@ -762,6 +762,8 @@ extend ::  Key s h -> FKeyMap s (Index t) ->
            FKeyMap s (Index (h : t))
 extend k m = insert k Head (ffmap Tail m)
 \end{code}
+The type of |extend| suggests that we could not have used the \st{} monad instead of the Key monad, because the internal state of the computation (represented by the |FKeyMap|) changes {\em type} after |extend|. To support this in the \st{} monad, we would need the equivalent of |ffmap|, which would map a function over all existing |STRef|s.
+
 With this machinery in place, we can translate |KExp| to |Bruijn| as follows:
 \begin{code}
 keyToBruijn :: KExp s a -> Bruijn [] a
