@@ -175,11 +175,11 @@ lookup k (Km [])       = Nothing
 lookup k (Km (h : t))  = 
   unlock k h `mplus` lookup k (Km t)
 
+(!) :: KeyMap s -> Key s a -> a
+m ! k = fromJust (lookup k m)
 \end{code}
 
 \subsection{Implementing the \st{} monad}
-
-\pablo{Note that |(!)| is not bound to anything.}
 
 Armed with our newly obtained |KeyMap|s, we can implement an (inefficient) version of the \st{} monad as follows. The implementation of |STRef|s is simply as an alias for |Key|s:
 \begin{code}
@@ -549,14 +549,14 @@ proc f = runKeyM $
 
 \subsection{Discussion}
 
-Altenkirch, Chapman and Uustalu\cite{relmonad} show a related construction: in category theory arrows are a special case of \emph{relative monads}, which are themselves a generalization of monads. A relative monad is an instance of the following type class:
+Altenkirch, Chapman and Uustalu\cite{relmonad} show a related construction: in category theory arrows are a special case of \emph{relative monads}, which are themselves a generalization of monads. In Haskell, a relative monad is an instance of the following type class:
 \begin{code}
 class RelativeM m v where
   rreturn  :: v x -> m x
   (.>>=)   :: m x -> (v x -> m y) -> m y
 \end{code}
 The only difference with regular monads is that the values resulting from computations must be wrapped in a type constructor |v|, instead of being ``bare''. The relative monad laws are also the same as the regular (Haskell) monad laws.
-The construction of Altenkirch et al. construction is not a relative monad in Haskell, only in category theory. In particular their construction uses the Yoneda embedding, which does not allow us freely use bound values, instead it requires us to manually lift values into scope, in the same fashion as directly using de Bruijn indices. 
+The construction of Altenkirch et al. which shows that arrows are an instance of relative monads is not a relative monad in Haskell, only in category theory. In particular their construction uses the Yoneda embedding, which does not allow us freely use bound values, instead it requires us to manually lift values into scope, in the same fashion as directly using de Bruijn indices. 
 
 Because all the operations in |ArrowSyn| (namely |(-<)|) return a |Cage|, it might be more informative to see it as a relative monad, i.e.:
 \begin{code}
@@ -618,7 +618,7 @@ data TExp a where
 \end{code}
 We cannot do much with this datatype. If we, for example, want to write an interpreter, then there is no way to represent the environment: we need to map names to values of different types, but there is no type-safe way to do so.
 
-We could add an extra argument to |Var| and |Lam| containing the type-representation, obtained using |Typeable|. With the Key monad, extend this simple naming approach to typed representations without adding |Typeable| constraints. Consider the following data type:
+We could add an extra argument to |Var| and |Lam| containing the type-representation of the type of the variable, obtained using |Typeable|. With the Key monad, extend this simple naming approach to typed representations without adding |Typeable| constraints. Consider the following data type:
 \begin{code}
 data KExp s a where
   KVar  ::  Key s a -> KExp s a
@@ -703,7 +703,8 @@ The well-scopedness of a |Bruijn| value follows from the fact that the value is 
 
 Our implementation of |phoasToBruijn| works by first translating |Phoas| to the |KExp| from the previous subsection, and then translating that to typed de Bruijn indices. The first step in this translation is straightforwardly defined using the |Hoas| interface from the previous subsection: 
 \begin{code}
-phoasToKey :: (forall v. Phoas v a) -> (forall s. KeyM s (KExp s a))
+phoasToKey ::  (forall v. Phoas v a) ->
+               (forall s. KeyM s (KExp s a))
 phoasToKey v = getExp (go v) where
   go :: Phoas (HoasKey s) a -> HoasKey s a
   go (PVar v)    = v
@@ -819,7 +820,7 @@ The second safety property that we are concerned with is \emph{referential trans
 let x = e in (x,x) ==  (e,e) 
 \end{code}
 
-In other words, referential transparency means that an expression always evaluates to the same result in any context. Our implementation of the key monad only relies on \emph{unsafeCoerce}; it does not use \emph{unsafePerformIO}, nor does it use |unsafeCoerce| to convert an |IO a| action to a pure value and hence referential transparency cannot be broken by this implementation. Since the |ST| monad can be implemented using the Key monad, the same can be said for the \st{} monad. 
+In other words, referential transparency means that an expression always evaluates to the same result in any context. Our implementation of the key monad only relies on \emph{unsafeCoerce}; it does not use \emph{unsafePerformIO}, nor does it use |unsafeCoerce| to convert an |IO a| action to a pure value and hence referential transparency cannot be broken by this implementation. Since the \st{} monad can be implemented using the Key monad, the same can be said for the \st{} monad. 
 However, more efficient implementations of the \st{} monad uses \emph{global} pointers respectively, which does rely on features that might potentially break referential transparency.
 
 
@@ -1017,11 +1018,11 @@ samePath _          _          = Nothing where
 \end{code}
 We can use this function to implement a function that produces a proof that if two paths to a leaf are the same, then their associated types are the same:
 \begin{code}
-sameLeaf ::  TTreePath (Leaf p) w ->
-             TTreePath (Leaf p') w -> 
+sameLeaf ::  TTreePath (Single p) w ->
+             TTreePath (Single p') w -> 
              Maybe (p :~: p')
 sameLeaf l r = weakenLeaf <$> samePath l r where
-  weakenLeaf :: (Leaf p :~: Leaf p') -> p :~: p'
+  weakenLeaf :: (Single p :~: Single p') -> p :~: p'
   weakenLeaf x = case x of Refl -> Refl
 \end{code}
 
@@ -1033,7 +1034,7 @@ type TName s a = TTreePath (Single a) s
 newTNameSupply :: TNameSupply s s
 tsplit ::  TNameSupply (l :++: r) s 
            -> (TNameSupply l s, TNameSupply r s)
-supplyTName :: TNameSupply (Leaf a) s -> TName s a
+supplyTName :: TNameSupply (Single a) s -> TName s a
 sameName ::  TName s a -> TName s b -> 
              Maybe (a :~: b)
 \end{code}
@@ -1077,11 +1078,11 @@ runKeyM :: (exists p. forall s. KeyIm s p a) -> a
 \end{code}
 These types are \emph{not} equivalent: the latter implies the former, but not the other way around. In the former, the type which is bound to |p| may depend on |s|, which cannot happen in the latter. 
 
- If the types of all keys which are created do not mention |s|, we do not for example create a key of type |Key s (Key s a)|, then one could argue that coercing the computation from the former to the latter is perfectly safe. However, if we create a key of type |Key s (Key s Int)|, then when the type |s| is unified with the tree of types of the keys, this leads to a \emph{cyclic} types. For example:
+ If the types of all keys which are created do not mention |s|, we do not for example create a key of type |Key s (Key s a)|, then one could argue that coercing the computation from the former to the latter is perfectly safe. However, if we create a key of type |Key s (Key s Int)|, then when the type |s| is unified with the tree of types of the keys, this leads to \emph{cyclic} types. For example:
 \begin{code}
 s ~ (Key s Int) :++: t
 \end{code} 
-In the previous section, we demonstrated that allowing such keys, where the type of the key mentions |s|, allows us to write |fix| without recursion. Apart from that, it seems that these particular cyclic types does not do any harm (we already had nontermination in Haskell), and it is likely to be safe to coerce the first type of |runKeyM| to the latter. However, it is highly unlikely that we can formalize this through types that this coercion is safe: the Haskell type system does not allow cyclic types. Even if it did, it is unclear to us how to prove that this coercion is safe.
+In the previous section, we demonstrated that allowing such keys, where the type of the key mentions |s|, allows us to write |fix| without recursion. Apart from that, it seems that these particular cyclic types does not do any harm (we already had nontermination in Haskell), and it is likely to be safe to coerce the first type of |runKeyM| to the latter. However, it is highly unlikely that we can formalize through types that this coercion is safe: the Haskell type system does not allow cyclic types. Even if it did, it is unclear to us how to prove that this coercion is safe.
 
 For |join| other problems arise. We need a implementation of type:
 \begin{code}
@@ -1112,7 +1113,7 @@ Now, we actually believe that the \st{} monad (and also the Key monad) is safe i
 
 \section{Conclusion}
 
-In the \st{} monad, one of the invariants that must hold is that when two references are the same, then their types must also be the same. We presented the Key monad, which splits reasoning based on this invariant into a separate interface, and makes it available to the user. We showed that this new interface gives a form of dynamic typing without the need for |Typeable| constraints, which allows us to do things we could not do before: it allows us to implement the \st{} monad, to implement an embedded form of arrow syntax and to translate parametric \hoas{} to typed de Bruijn indices. The Key monad is simpler than the \st{} monad, since the former embodies just one aspect of the latter. A full proof of the safety of the \st{} monad remains elusive to this day, but a proof of the safety of the Key monad might be a stepping stone towards it.
+In the \st{} monad, one of the invariants that must hold is that when two references are the same, then their types must also be the same. We presented the Key monad, which splits reasoning based on this invariant into a separate interface, and makes it available to the user. We showed that this new interface gives a form of dynamic typing without the need for |Typeable| constraints, which allows us to do things we could not do before: it allows us to implement the \st{} monad, to implement an embedded form of arrow syntax and to translate parametric \hoas{} to typed de Bruijn indices. The Key monad is simpler than the \st{} monad, since the former embodies just one aspect of the latter. A full proof of the safety of the \st{} monad remains elusive to this day. We feel that the Key monad might be the key to the proof of the \st{} monad. 
 
 \paragraph{Acknowledgements}
 We thank Gershom Bazerman, Jonas Dure\-g{\aa}rd and John Hughes for helpful comments and insightful discussions.
