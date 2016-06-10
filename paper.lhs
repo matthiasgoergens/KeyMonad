@@ -1049,7 +1049,7 @@ sameName ::  TName s a -> TName s b ->
 \end{code}
 A typed name supply of type |TNameSupply l s| gives unique names for the types in the subtree |l| which can be tested for equality, using |sameName|, with all names which are created in the context |s|. The implementations of the name supply functions are completely analogous to their untyped counterparts.
 
-By using the typed name supply instead of the regular name supply and altering the types in the interface to reflect this change, we obtain an implementation of what we call the \emph{indexed} the Key monad, with the following interface:
+By using the typed name supply instead of the regular name supply and altering the types in the interface to reflect this change, we obtain an implementation of what we call the \emph{indexed} Key monad, with the following interface:
 \begin{code}
 newKeyIm        ::  KeyIm s (Single a) (Key s a)
 
@@ -1061,7 +1061,7 @@ runKeyIm      :: (forall s. KeyIm s l a) -> a
 
 testEquality  ::  Key s a -> Key s b -> Maybe (a :~: b)
 \end{code}
-The implementation of this interface is completely analogous to the implementation of the key monad in the previous subsection. The only difference is that |testEquality| now uses |sameName|, omitting the need for |unsafeCoerce|.
+The implementation of this interface is completely analogous to the implementation of the Key monad in the previous subsection. The only difference is that |testEquality| now uses |sameName|, omitting the need for |unsafeCoerce|.
 This interface is an instance of the \emph{parametric effect monad} type class\cite{peff}. 
 
 Note that in the implementation |runKeyIm| now uses the universally quantified type variable to |s| to unifiy |s| with |l|, to use |newTNameSupply|. This ``closes the context'', stating that the context is precisely the types which are created in the computation. In contrast, in |runKeyM| the type variable was not given an interpretation.
