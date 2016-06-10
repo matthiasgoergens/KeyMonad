@@ -824,10 +824,10 @@ The argument why the scope type variable |s| and the key value |k| together uniq
 
 The second safety property that we are concerned with is \emph{referential transparency}. More precisely, in an otherwise pure language with the Key monad extension, does the following still hold?
 \begin{code}
-let x = e in (x,x) ==  (e,e) 
+(let x = e in f x x) == f e e 
 \end{code}
 
-In other words, referential transparency means that an expression always evaluates to the same result in any context. Our implementation of the key monad only relies on \emph{unsafeCoerce}; it does not use \emph{unsafePerformIO}, nor does it use |unsafeCoerce| to convert an |IO a| action to a pure value and hence referential transparency cannot be broken by this implementation. Since the \st{} monad can be implemented using the Key monad, the same can be said for the \st{} monad. 
+In other words, referential transparency means that an expression always evaluates to the same result in any context. Our implementation of the key monad only relies on \emph{unsafeCoerce}; it does not use \emph{unsafePerformIO}, nor does it use |unsafeCoerce| to convert an |IO a| action to a pure value (if we assume type safety) and hence referential transparency cannot be broken by this implementation. Since the \st{} monad can be implemented using the Key monad, the same can be said for the \st{} monad. 
 However, more efficient implementations of the \st{} monad uses \emph{global} pointers respectively, which does rely on features that might potentially break referential transparency.
 
 
@@ -845,7 +845,7 @@ boolBool =
 boolInt  = 
   AbsBool  0 1        (\c t f -> if c == 0 then t else f)
 \end{code}
-If our language is abstraction safe, then it is impossible to observe any difference between |boolBool| and |boolInt|. This property is formalized by \emph{parametricity} (which also gives ``free'' theorems\cite{theoremsforfree}). A typical example of a primitive which is not abstraction safe (but is type-safe) is a primitive that allows us to check the equality of any two types:
+If our language is abstraction safe, then it is impossible to observe any difference between |boolBool| and |boolInt|. This property is formalized by \emph{parametricity} (which also gives ``free'' theorems \cite{theoremsforfree}). A typical example of a primitive which is not abstraction safe (but is type-safe) is a primitive that allows us to check the equality of any two types:
 \begin{code}
 badTest :: a -> b -> Maybe (a :~: b)
 \end{code}
