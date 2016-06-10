@@ -207,7 +207,7 @@ writeSTRef k v = ST $ modify (insert k v)
 
 
 \end{code}
-Finally, the implementation of |runST| simply runs the monadic computation contained in the \st{} type:
+Finally, the implementation of |runST| simply runs the monadic computation contained in the \st{} type, but needs some extra annotations to convince the type checker:
 \begin{code}
 runST :: (forall s. ST s a) -> a
 runST m = runKeyM (evalStateT (unpack m) empty)

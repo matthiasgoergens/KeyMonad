@@ -9,7 +9,7 @@ import Control.Applicative
 import Control.Monad.Writer
 import Data.Monoid
 
-newtype Cage s x = Cage { liberate :: KeyMap s -> x }
+newtype Cage s x = Cage { open :: KeyMap s -> x }
   deriving (Functor, Applicative)
 
 newtype ArrowSyn a s x =
@@ -30,7 +30,7 @@ introEnv :: Arrow a => Key s x -> a x (KeyMap s)
 introEnv k = arr (singleton k)
 
 elimEnv :: Arrow a => Cage s x -> a (KeyMap s) x
-elimEnv c = arr (liberate c)
+elimEnv c = arr (open c)
 
 extendEnv :: Arrow a =>  Key s x ->
                          a (x, KeyMap s) (KeyMap s)
