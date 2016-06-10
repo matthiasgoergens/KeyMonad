@@ -132,7 +132,7 @@ Our contributions are as follows:
           \item to represent typed variables in typed representations of syntax (Section \ref{syntax});
           \item to translate parametric \hoas{} to nested de Bruijn indices, which allows interpretations of parametric \hoas{} terms, such as translation to Cartesian closed categories, which are not possible otherwise (Section \ref{syntax}).
 \end{itemize}
-\item We identify some key missing pieces in the correctness proof of the \st{} monad (Section \ref{stdis}). The Key monad may be a stepping stone to finding this proof.
+\item We identify some key missing pieces in the correctness proof of the \st{} monad (Section \ref{stdis}). The Key monad may be a stepping stone to finding the complete proof.
 \end{itemize}
 
 \noindent The Haskell code discussed in this paper can be found online at: 
