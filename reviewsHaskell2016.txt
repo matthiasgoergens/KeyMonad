@@ -1,0 +1,273 @@
+===========================================================================
+                         Haskell 2016 Review #12A
+---------------------------------------------------------------------------
+      Paper #12: The Key Monad:Type-Safe Unconstrained Dynamic Typing
+---------------------------------------------------------------------------
+
+                      Overall merit: C. Weak paper, though I will not fight
+                                        strongly against it
+                         Confidence: X. I am an expert in this area
+
+                         ===== Paper summary =====
+
+This paper presents the KeyM monad and Key type. The Key type carries a type
+index; by comparing two Keys, we can learn whether or not the type indices are
+the same. By so doing, Keys allow a form of dynamic typing, where a runtime
+comparison can be informative to Haskell's compile-time type checker. The safety
+of the Keys is guaranteed by the same parametricity trick that powers the (supposed)
+safety of the ST monad. The authors present several case studies of applications of Keys.
+The paper concludes with sections describing a conjecture of type safety (among
+other properties) and presenting the implementation of the Key monad, which relies
+critically on a use of unsafeCoerce.
+
+                      ===== Comments for author =====
+
+This paper does a fine job of presenting the Key monad and describing its applications.
+It is easy to understand. However, I remain unconvinced of the impact and
+novelty of this work.
+As the authors concede, all of the power of the Key monad could be recovered
+(modulo laziness) by adding
+one function to the ST interface (namely,
+testEquality :: STRef s a -> STRef s b -> Maybe (a :~: b)). They also admit that all
+of the capabilities of Keys are recoverable with a Typeable constraint. I don't see
+an argument in the paper for why a Typeable constraint would be so awful to carry around,
+recalling that recent GHC versions make all (non-variable) types Typeable.
+
+The authors seem to sense
+that the impact of their work might be called into question, and so pose themselves the
+question "Why is the Key monad interesting?" Two of their three answers compare the
+Key monad to the ST monad, saying that because Key is simpler than ST, it is interesting.
+I do agree with the authors' claim that the Key monad's simplicity may provide an avenue
+for proving the safety of ST. However, I would imagine that the challenge in such a proof
+is far bigger than the distance between Key and ST: it's in proving parametricity for
+Haskell. I thus remain skeptical of these reasons.
+
+The third reason (the first, in the text) that Key is interesting is because
+of testEquality. Here I agree, but the benefits of testEquality can be seen
+when looking at Typeable. Indeed, recent work has done this [1], including
+several of the same examples as this paper---including an implementation of
+the ST monad. Perhaps the authors are unaware of this quite recent paper?
+
+Adding this all together, I'm concerned about the level of novelty here.
+
+Despite these worries, I found the case studies interesting, showing how the Key
+monad could mock up arrow notation and be useful in working with higher-order
+abstract syntax. I see these case studies as real contributions of this work.
+Another interesting contribution is the analysis of proofs---or lack thereof---of
+the safety of the ST monad, as well as pinning down what, precisely, safety would mean.
+
+Smaller notes on section 5.4 (Normalization): The authors claim that if we disallow
+term-level recursion and disallow contravariant type-level recursion, Haskell is
+terminating. Why? In a language as rich as Haskell, I would imagine there are other
+ways to get non-termination. In any case, I'm not surprised that the Key monad, with
+its ability to do runtime type comparisons, could
+introduce non-termination, as explored in [1], [2], and [3]. While I do think it's
+worthwhile to point out this "feature" of Keys, I would also want a reference to
+some of the prior work establishing that these type equality checks can induce
+non-termination.
+
+TYPOS, ETC.
+
+First sentence of Section 3.3: You can drop the "Altenkirch et al." in the citation.
+
+Right below Figure 4: "This seems to be not only be impossible" -->
+"This seems to be impossible not only"
+
+Third paragraph of Section 5.4: "Fig. 5.4" --> "Fig. 6"
+
+Third paragraph of Section 6.2: "hetrogenous" --> "heterogeneous"
+
+First sentence of last paragraph on left column of page 11: This sentence looks
+like it got mangled in the editing. It also misspells "unify" as "unifiy".
+
+Following paragraph: "to be statically know" --> "to be statically known". Furthermore,
+I don't fully follow why this is true.
+
+[1]: Simon Peyton Jones, Stephanie Weirich, Richard A. Eisenberg, and Dimitrios Vytiniotis.
+A reflection on types. Wadlerfest, 2016.
+
+[2]: Dimitrios Vytiniotis and Stephanie Weirich. Parametricity, type equality, and
+higher-order polymorphism. JFP, 2010.
+
+[3]: Robert Harper and John C. Mitchell. Parametricity and variants of Girard's J
+operator. Information Processing Letters, 1999.
+
+===========================================================================
+                         Haskell 2016 Review #12B
+---------------------------------------------------------------------------
+      Paper #12: The Key Monad:Type-Safe Unconstrained Dynamic Typing
+---------------------------------------------------------------------------
+
+                      Overall merit: B. OK paper, but I will not champion
+                                        it
+                         Confidence: X. I am an expert in this area
+
+                         ===== Paper summary =====
+
+The paper presents a polymorphic dynamic name generation monad, which
+the authors call the 'key monad', and which is similar in spririt to,
+though arguably more primitive than, the ST monad. The authors
+illustrate a range of different applications of the key monad
+including dynamic typing without typeclass constraints, implementing
+the ST monad, implementing arrow notation, and representing variables
+in embedded domain specific languages. They discuss what it would mean
+to prove safety of the key monad and outline an informal argument for
+type safety. They also give a straightforward implementation of the
+key monad which relies on unsafeCoerce.
+
+The paper is well-written, tackles an interesting problem, and is
+clearly in scope for the Haskell Symposium.
+
+                      ===== Comments for author =====
+
+The key monad seems like a useful abstraction. It provides a kind of
+bridge between the statically typed and dynamically typed
+worlds. Perhaps you could be a little more explicit about exactly
+where runtime errors can occur (e.g. by calling fromJust) and how you
+sometimes manage to rule them out by abstraction.
+
+It is clear that the KExp data type in Section 4 offers only a minimal
+amount of safety because it requires the programmer to manipulate keys
+explicitly. In contrast, the implemenation of arrows in Section 3
+looks relatively safe to me as long as you don't expose the auxiliary
+functions. If you believe it is safe, then I suggest you give an
+informal argument for how and why.
+
+Atkey's TLCA 2009 paper and Atkey et al.'s Haskell 2009 paper are
+closely related to Section 4. You should cite them. You claim that the
+key monad is necessary in order to translate from HOAS to de
+Bruijn. This is rather misleading. Formally what is needed is
+parametricity (see Atkey's TLCA 2009 paper). The Haskell type system
+does not internalise parametricity, so unsafeCoerce or a dynamic cast
+is needed. But to implement the key monad we need unsafeCoerce.
+
+I find the name "parametric HOAS" a little problematic. Your first
+Hoas class is just as parametric (the f parameter can be instantiated
+to give different interpretations) as your Phoas class (where the v
+parameter can be similarly instantiated). The relevant difference is
+between standard HOAS and weak HOAS. The former requires negative
+recursive types whereas the latter does not so can be implemented in
+systems such as Agda and Coq.
+
+You state that there are no correctness proofs for the ST monad in the
+literature. It might be wiser to qualify that by saying that you are
+unaware of any such proofs in the literature. Its a bit disappointing
+that you make little mention of the treatment of higher-order state in
+general in the literature, which has been studied extensively.
+
+I would expect that parametricity is central to proving safety of the
+key monad.
+
+Minor comments and typos:
+
+1: "to user"
+2.1: "unlock to"
+
+2.4: "In the same line of reasoning" |-> "Following the same line of reasoning"
+
+3.2:
+  - "from from"
+  - "lookup k env" should be "env ! k"
+  - "Next to introducing and eliminating environments" what?
+
+3.3:
+  - "This essentially" (missing "is")
+  - Something has gone wrong with your citations (throughout the
+    paper, actually)
+  - "as relative monad" (missing "a")
+  - "but the we"
+
+4.1:
+  - "With the Key monad, extend" (missing "we")
+
+4.2:
+  - "Figure 4.2". Something seems to have gone wrong with references to
+    figures here and elsewhere in the paper.
+
+5.1: "uniquely determine the" should be "uniquely determines the"
+
+5.2:
+  - "uses global pointers respectively" should be "use global pointers"
+  - "which does" should be "which do"
+
+5.4:
+  - Here you write "Fig. 5.4". Elsewhere you write "Figure". Be
+consistent.
+  - Its not surprising that normalization fails in the presence of the
+    key monad, given that the key monad is expressive enough to
+    implement higher-order state and higher-order state is well known
+    to be sufficient for expressing a fix point combinator.
+
+6.1:
+  - "an splittable"
+  - perhaps add a citation for splittable name supplies (maybe McBride
+    and McKinna's Haskell 2004 pearl)
+
+6.2:
+  - "then produce a that the proof types" should be "then produce a
+    proof that the two types"
+  - overfull hbox
+  - Indexed monads, parametric effect monads, and graded monads are
+    all names for the same thing. Apparently the preferred name for
+    theorists is now "graded monad". See recent work by Katsumata and
+    coauthors.
+  - "unifiy"
+
+6.3:
+  - "leads a" (missing "to")
+  - "a implementation"
+
+===========================================================================
+                         Haskell 2016 Review #12D
+---------------------------------------------------------------------------
+      Paper #12: The Key Monad:Type-Safe Unconstrained Dynamic Typing
+---------------------------------------------------------------------------
+
+                      Overall merit: A. Good paper, I will champion it
+                         Confidence: Y. I am knowledgeable in this area,
+                                        but not an expert
+
+                         ===== Paper summary =====
+
+The main idea is that one can develop a simplified version of ST
+where
+
+1. the "references" are just "keys" associated with a "type",
+2. if two keys have the same value, then they are associate
+   to the same type.
+
+As distinct keys need to be generated, the above yields
+a "Key Monad". The paper goes on to discuss several nice
+applications of such a monad. In addition, the paper argues
+that the key monad could be a stepping stone towards a formal
+proof of the safety of the ST monad, and sketches a route to
+such a proof by outlining some laws about the monad.
+
+                      ===== Comments for author =====
+
+This is an excellent paper, that I thoroughly
+enjoyed reading. This paper strikes me as a
+really nice and seemingly simple idea, but
+which can have far reaching consequences.
+
+The applications shown here include:
+
+a. creating heterogenous lists and maps _without_
+   requiring `Typeable` constraints,
+
+b. using plain (monadic) binders to recover
+   arrow notation,get a clean syntax for arrows,
+   essentially by using "keys" to represent
+   the intermediate values.
+
+c. developing nice typed representations of
+   lambda terms including a HOAS interface.
+
+I suspect many more could be found, including
+support for "regions" or "resources".
+
+In addition the paper is very well
+written -- a pearl -- with lots of
+examples.
+
+It would be a great addition to the program.
