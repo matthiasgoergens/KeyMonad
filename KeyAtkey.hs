@@ -76,7 +76,11 @@ type AbsKeyM a = forall km s.
        (forall a b. km s a -> (a -> km s b) -> km s b) -> 
        km s a
 
--- atkey type reasoning: forall a. the denotation of type AbsKeyM a is isomorphic to (exists s. KeyIM s s a) (for finite computations? What happens for infinite. Need infinite types?)
+-- atkey type reasoning: forall a. 
+--   the denotation of type AbsKeyM a is isomorphic to
+--    (exists s. KeyIM s s a) 
+-- (for finite computations? What happens for infinite. Need infinite types?)
+-- I don't know if this follows from a parametricity for GADTs + Kripke stuff
 
 
 data ClosedKeyIM a where
