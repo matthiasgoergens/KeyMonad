@@ -550,7 +550,7 @@ proc f = runKeyM $
 
 \subsection{Discussion}
 
-Altenkirch, Chapman and Uustalu\cite{relmonad} show a related construction: in category theory arrows are a special case of \emph{relative monads}, which are themselves a generalization of monads. In Haskell, a relative monad is an instance of the following type class:
+Altenkirch, Chapman and Uustalu~\cite{relmonad} show a related construction: in category theory arrows are a special case of \emph{relative monads}, which are themselves a generalization of monads. In Haskell, a relative monad is an instance of the following type class:
 \begin{code}
 class RelativeMonad m v where
   rreturn  :: v x -> m x
@@ -704,7 +704,7 @@ The types |(forall v. Phoas v a)| and |(Bruijn [] a)| both represent well-scoped
 \begin{code}
 phoasToBruijn :: (forall v. Phoas v a) -> Bruijn [] a
 \end{code} 
-This seems to be not only be impossible in Haskell without extensions, but in dependently typed languages without extensions as well. For example, when using |Phoas| in \emph{Coq} to prove properties about programming languages, a small extension to the logic in the form of a special well-scopedness axiom for the |Phoas| data type is needed to translate Phoas to de Bruijn indices\cite{phoas}.
+This seems to be impossible not only in Haskell without extensions, but in dependently typed languages without extensions as well. For example, when using |Phoas| in \emph{Coq} to prove properties about programming languages, a small extension to the logic in the form of a special well-scopedness axiom for the |Phoas| data type is needed to translate Phoas to de Bruijn indices\cite{phoas}.
 
 The well-scopedness of a |Bruijn| value follows from the fact that the value is well-typed. With |Phoas|, the well-scopedness relies on the meta-level (i.e. not formalized through types) argument that no ill-scoped values can be created using the |Phoas| interface. The internal (i.e. formalized through types) well-scopedness of |Bruijn|, allows interpretations of syntax which seem to not be possible if we are using terms constructed with |Phoas|. As an example of this, consider translating lambda terms to \emph{Cartesian closed category} combinators (the categorical version of the lambda calculus), which is useful for translating lambda terms to hardware \cite{conalccc}. This can be done if the lambda terms are given as |Bruijn| values, as demonstrated in Figure \ref{ccc}. Without the Key monad, there seem to be no way to do the same for terms constructed with the |Phoas| terms, but with the |Key| monad we can for example first translate to de Bruijn indices and then to Cartesian closed categories. 
 
@@ -909,8 +909,8 @@ fix f = runKeyM $
        return (unVal fixf)
  where unVal (Val x) = x
 \end{code}
-\label{fig:fix}
 \caption{Implementing a general fixpoint combinator without term-level recursion nor type-level contravariant recursion}
+\label{fig:fix}
 \end{figure}
 %$
 Fig.\ \ref{fig:fix} presents the implementation of |fix|. First, we introduce a datatype |D s a| for domains representing models of the untyped lambda calculus. (We are going to encode the standard fixpoint combinator |\f -> (\x -> f (x x)) (\x -> f (x x))| in this domain.) An element of |D s a| is either a function over |D s a| or a value of type |a|. Normally, we would use contravariant recursion for the argument of |Fun|, but we are not allowed to, so we mask it by using a |Box s| instead. As a result, |D s a| is not contravariantly recursive, and neither are any of its instances.
@@ -995,7 +995,7 @@ testEquality (Tail l)  (Tail r)  = testEquality l r
 testEquality _         _         = Nothing
 \end{code}
 
-We can employ the same insight to construct |testEquality| function for other data types. Instead of indexes in a heterogeneous list, we add types to the paths in a tree to obtain  \emph{paths in a hetrogenous tree}. For this datatype we need to be able to construct type-level trees, for which we use the following data type as a data-kind:
+We can employ the same insight to construct |testEquality| function for other data types. Instead of indexes in a heterogeneous list, we add types to the paths in a tree to obtain  \emph{paths in a heterogenous tree}. For this datatype we need to be able to construct type-level trees, for which we use the following data type as a data-kind:
 \begin{code}
 data Tree a = Empty | Single a | Tree a :++: Tree a
 \end{code}
@@ -1067,9 +1067,9 @@ testEquality    ::  Key s a -> Key s b -> Maybe (a :~: b)
 The implementation of this interface is completely analogous to the implementation of the Key monad in the previous subsection. The only difference is that |testEquality| now uses |sameName|, omitting the need for |unsafeCoerce|.
 This interface is an instance of the \emph{parametric effect monad} type class\cite{peff}. 
 
-Note that in the implementation |runKeyIm| now uses the universally quantified type variable to |s| to unifiy |s| with |l|, to use |newTNameSupply|. This ``closes the context'', stating that the context is precisely the types which are created in the computation. In contrast, in |runKeyM| the type variable was not given an interpretation.
+Note that in the implementation of |runKeyIm| the universally quantified type variable |s| gets unified with |l| in order to use |newTNameSupply|. This ``closes the context'', stating that the context is precisely the types which are created in the computation. In contrast, in |runKeyM| the type variable was not given an interpretation.
 
-While we have succeeded in avoiding |unsafeCoerce|, this construction is \emph{less powerful} than the regular Key monad because the types of the keys which are going to be created must now be \emph{statically known}. All example use cases of the Key monad in this paper rely on the fact that the type of the keys which are going to be created do not have to be statically know. For example, we cannot implement a translation from parametric \hoas{} to de Bruijn indices with |KeyIM|, because the type of the keys which will have to be created is precisely the information that a parametric \hoas{} representation lacks.
+While we have succeeded in avoiding |unsafeCoerce|, this construction is \emph{less powerful} than the regular Key monad because the types of the keys which are going to be created must now be \emph{statically known}. All example use cases of the Key monad in this paper rely on the fact that the type of the keys which are going to be created do not have to be statically known. For example, it is not possible to implement a translation from parametric \hoas{} to de Bruijn indices with |KeyIM|, because the type of the keys which would have to be created is precisely the information that a parametric \hoas{} representation lacks.
 
 \subsection{Attempting to recover the Key monad}
 

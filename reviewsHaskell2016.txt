@@ -69,19 +69,29 @@ non-termination.
 TYPOS, ETC.
 
 First sentence of Section 3.3: You can drop the "Altenkirch et al." in the citation.
+* I don't get this comment. Ignored.
 
 Right below Figure 4: "This seems to be not only be impossible" -->
 "This seems to be impossible not only"
+* DONE
 
 Third paragraph of Section 5.4: "Fig. 5.4" --> "Fig. 6"
+* DONE
 
 Third paragraph of Section 6.2: "hetrogenous" --> "heterogeneous"
+* DONE
 
 First sentence of last paragraph on left column of page 11: This sentence looks
-like it got mangled in the editing. It also misspells "unify" as "unifiy".
+like it got mangled in the editing. It also misspells "unify" as
+"unifiy".
+* SORT OF DONE. Did my best to make the sentence meaningful and
+grammatical, but I'm not sure.
 
 Following paragraph: "to be statically know" --> "to be statically known". Furthermore,
 I don't fully follow why this is true.
+* DONE. Comment is too vague.
+
+* TODO: Add the following references to related work (possibly).
 
 [1]: Simon Peyton Jones, Stephanie Weirich, Richard A. Eisenberg, and Dimitrios Vytiniotis.
 A reflection on types. Wadlerfest, 2016.
