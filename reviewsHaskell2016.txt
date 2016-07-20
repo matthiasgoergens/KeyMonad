@@ -143,6 +143,7 @@ looks relatively safe to me as long as you don't expose the auxiliary
 functions. If you believe it is safe, then I suggest you give an
 informal argument for how and why.
 
+* TODO:
 Atkey's TLCA 2009 paper and Atkey et al.'s Haskell 2009 paper are
 closely related to Section 4. You should cite them. You claim that the
 key monad is necessary in order to translate from HOAS to de
@@ -172,33 +173,40 @@ Minor comments and typos:
 
 1: "to user"
 2.1: "unlock to"
+*DONE
 
 2.4: "In the same line of reasoning" |-> "Following the same line of reasoning"
+*DONE
 
 3.2:
   - "from from"
   - "lookup k env" should be "env ! k"
   - "Next to introducing and eliminating environments" what?
+*DONE
 
 3.3:
   - "This essentially" (missing "is")
   - Something has gone wrong with your citations (throughout the
-    paper, actually)
+    paper, actually) * TODO!
   - "as relative monad" (missing "a")
   - "but the we"
 
 4.1:
   - "With the Key monad, extend" (missing "we")
+  *DONE
 
 4.2:
   - "Figure 4.2". Something seems to have gone wrong with references to
     figures here and elsewhere in the paper.
+* TODO!
 
 5.1: "uniquely determine the" should be "uniquely determines the"
+*DONE
 
 5.2:
   - "uses global pointers respectively" should be "use global pointers"
   - "which does" should be "which do"
+*DONE
 
 5.4:
   - Here you write "Fig. 5.4". Elsewhere you write "Figure". Be
@@ -207,11 +215,13 @@ consistent.
     key monad, given that the key monad is expressive enough to
     implement higher-order state and higher-order state is well known
     to be sufficient for expressing a fix point combinator.
+* TODO
 
 6.1:
   - "an splittable"
   - perhaps add a citation for splittable name supplies (maybe McBride
     and McKinna's Haskell 2004 pearl)
+* TODO
 
 6.2:
   - "then produce a that the proof types" should be "then produce a
@@ -220,12 +230,13 @@ consistent.
   - Indexed monads, parametric effect monads, and graded monads are
     all names for the same thing. Apparently the preferred name for
     theorists is now "graded monad". See recent work by Katsumata and
-    coauthors.
+    coauthors. * TODO
   - "unifiy"
 
 6.3:
   - "leads a" (missing "to")
   - "a implementation"
+*DONE
 
 ===========================================================================
                          Haskell 2016 Review #12D

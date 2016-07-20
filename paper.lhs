@@ -99,7 +99,7 @@ data a :~: b where Refl :: a :~: a
 \end{figure}
 
 In this paper, we provide a new abstraction in Haskell (+ \gadt s and rank-2 types) that
-embodies only feature (3) above: the combination of references (which we call {\em keys}) of different, unconstrained types in the same computation. In the \st{} monad, the essential invariant that must hold for feature (3), is that when two references are the same, then their types \emph{must also be the same}. Our new abstraction splits reasoning based on this invariant into a separate interface, and makes it available to user. The result is a small library called {\em the Key monad}, of which the \api{} is given in Fig.\ \ref{fig:key-monad}. 
+embodies only feature (3) above: the combination of references (which we call {\em keys}) of different, unconstrained types in the same computation. In the \st{} monad, the essential invariant that must hold for feature (3), is that when two references are the same, then their types \emph{must also be the same}. Our new abstraction splits reasoning based on this invariant into a separate interface, and makes it available to the user. The result is a small library called {\em the Key monad}, of which the \api{} is given in Fig.\ \ref{fig:key-monad}. 
 
 The Key monad |KeyM| is basically a crippled version of the \st{} monad: we can monadically create keys of type |Key s a| using the function |newKey|, but we cannot read or write values to these keys; in fact, keys do not carry any values at all. We can convert a computation in |KeyM| into a pure value by means of |runKeyM|, which requires the argument computation to be polymorphic in |s|, just like |runST| would.
 
@@ -151,7 +151,7 @@ The power to prove that two types are the same allows us to do similar things as
 \begin{code}
 data Box s where
   Lock :: Key s a -> a -> Box s
-\end{code} If we have a |Key| and a |Box|, we can try to unlock to the box to recover the value it contains.
+\end{code} If we have a |Key| and a |Box|, we can try to unlock the box to recover the value it contains.
 \begin{code}
 unlock :: Key s a -> Box s -> Maybe a
 unlock k (Lock k' x) =
@@ -247,7 +247,7 @@ This is something you can only do using |unsafeInterleaveST| in the \st{} monad.
 
 Why is the |testEquality| function for |STRef|s safe? The reason is that if two references are the same, then their types must also be the same. This invariant must already be true for \st{} references, because otherwise we could have two references pointing to the same location with different types. Writing to one reference and then reading from the other would coerce the value from one type to another! Hence, the Key monad  splits reasoning based on this invariant into a separate interface and makes it available to the user via |testEquality|.
 
-In the same line of reasoning, it is already possible to implement a similar, but weaker, version of |testEquality| using only the standard \st{} monad functions. If we represent keys of type |Key s a| as a pair of an identifier and an |STRef| containing values of type |a|, then we can create a function that casts a value of type |a| to |b|, albeit monadically, i.e. we get a monadic cast function |a -> ST s b| instead of a proof |a :~: b|:
+Following the same line of reasoning, it is already possible to implement a similar, but weaker, version of |testEquality| using only the standard \st{} monad functions. If we represent keys of type |Key s a| as a pair of an identifier and an |STRef| containing values of type |a|, then we can create a function that casts a value of type |a| to |b|, albeit monadically, i.e. we get a monadic cast function |a -> ST s b| instead of a proof |a :~: b|:
 \begin{code}
 data Key s a = Key{  ident :: STRef s (),
                      ref   :: STRef s a }
@@ -471,7 +471,7 @@ instance Arrow a => Monoid (EnvArrow a x) where
     mappend (EnvArrow l) (EnvArrow r) = 
          EnvArrow (l >>> r)
 \end{code}
-The definition of |ArrowSyntax| uses the standard writer monad transformer, |WriterT|, which produces |mempty| for |return|, and composes the built values from from the left and right hand side of |>>=| using |mappend|, giving us precisely what we need for building arrows. 
+The definition of |ArrowSyntax| uses the standard writer monad transformer, |WriterT|, which produces |mempty| for |return|, and composes the built values from the left and right hand side of |>>=| using |mappend|, giving us precisely what we need for building arrows. 
 
 
 
@@ -481,7 +481,7 @@ To define the operations |proc| and |(-<)|, we first define some auxiliary funct
 We can easily convert a name (|Key|) to the expression (|Cage|) which consists of looking up that name in the environment:
 \begin{code}
 toCage :: Key s a -> Cage s a
-toCage k = Cage (\env -> lookup k env)
+toCage k = Cage (\env -> env ! k)
 \end{code}
 We can introduce an environment from a single value, when given a name (|Key|) for that value: 
 \begin{code}
@@ -493,7 +493,7 @@ We also define an arrow to eliminate an environment, by interpreting an expressi
 elimEnv :: Arrow a => Cage s x -> a (KeyMap s) x
 elimEnv c = arr (open c)
 \end{code}
-Next to introducing and eliminating environments, we also need to extend an environment and evaluate an expression while keeping the environment:
+Apart from functions to introduce and eliminate environments, we also need functions to extend an environment and to evaluate an expression while keeping the environment:
 \begin{code}
 extendEnv :: Arrow a =>  Key s x ->
                          a (x, KeyMap s) (KeyMap s)
@@ -569,7 +569,7 @@ instance RelativeMonad (ArrowRM a s) (Cage s)
 proc :: (forall a. Cage s x -> ArrowRM a s y) -> a x y
 \end{code}
 In this formulation, it is clear that the user cannot decide what to do next based on the outcome of a computation: all we can get from a computation is |Cage|s. 
-The monadic interface does not add extra power: while we cannot decide what to do next based on the output of a computation of type |ArrowSyntax s (Cage s x)|, we can, for example, decide what to next based on the outcome of a computation of type |ArrowSyntax s Int|. This does not give our embedded arrow notation more power than regular arrow notation or the relative monad interface: the value of the integer cannot depend on the result of an arrow computation and hence must be the result of a pure computation. This essentially the same trick as described in Svenningsson and Svensson\cite{bjorn}. 
+The monadic interface does not add extra power: while we cannot decide what to do next based on the output of a computation of type |ArrowSyntax s (Cage s x)|, we can, for example, decide what to next based on the outcome of a computation of type |ArrowSyntax s Int|. This does not give our embedded arrow notation more power than regular arrow notation or the relative monad interface: the value of the integer cannot depend on the result of an arrow computation and hence must be the result of a pure computation. This is essentially the same trick as described in Svenningsson and Svensson\cite{bjorn}. 
 
 As an aside, more generally, this trick can be used to give a monadic interface for \emph{any} relative monad:
 \begin{code}
@@ -592,9 +592,9 @@ toRelativeM :: RelativeMonad rm v =>
 toRelativeM (Pure x)      = rreturn x
 toRelativeM (Unpure m f)  = m .>>= (toRelativeM :. f)
 \end{code}
-The insight is that because a computation must eventually return a value of |v a| to convert a relative monad computation via |toRelativeM|, any pure value that is used, can eventually be removed via the monad law |return x >>= f == f x|. Our embedded arrow construction can be seen as relative monad, where we apply this trick to obtain a monadic interface.
+The insight is that because a computation must eventually return a value of |v a| to convert a relative monad computation via |toRelativeM|, any pure value that is used, can eventually be removed via the monad law |return x >>= f == f x|. Our embedded arrow construction can be seen as a relative monad, where we apply this trick to obtain a monadic interface.
 
-Our construction hence suggests that arrows are also a special case of relative monad in Haskell with the key monad, but a formal proof (using the Key monad laws from Figure (\ref{laws})) is outside the scope of this paper. In the code online, we also show that this construction can be extended to use \emph{relative monadfix} (with function  |rmfix :: (v a -> m a) -> m a|) to construct arrows using |ArrowLoop|, but the we cannot use recursive monad notation in this case, because the above trick does not extend to Monadfix.
+Our construction hence suggests that arrows are also a special case of relative monad in Haskell with the key monad, but a formal proof (using the Key monad laws from Figure (\ref{laws})) is outside the scope of this paper. In the code online, we also show that this construction can be extended to use \emph{relative monadfix} (with function  |rmfix :: (v a -> m a) -> m a|) to construct arrows using |ArrowLoop|, but we cannot use recursive monad notation in this case, because the above trick does not extend to Monadfix.
 
 
 The \emph{Arrow Calculus}\cite{arrowcalc} describes a translation of a form of arrow syntax (not embedded in Haskell) to arrows which is very similar to the construction presented here. Their calculus has five laws, three of which can be considered to be relative monad laws, which they use to prove the equational correspondence between their calculus and regular arrows. Due to the similarity, their paper should provide a good starting point for anyone trying to prove the same for this construction.
@@ -621,7 +621,7 @@ data TExp a where
 \end{code}
 We cannot do much with this datatype. If we, for example, want to write an interpreter, then there is no way to represent the environment: we need to map names to values of different types, but there is no type-safe way to do so.
 
-We could add an extra argument to |Var| and |Lam| containing the type-representation of the type of the variable, obtained using |Typeable|. With the Key monad, extend this simple naming approach to typed representations without adding |Typeable| constraints. Consider the following data type:
+We could add an extra argument to |Var| and |Lam| containing the type-representation of the type of the variable, obtained using |Typeable|. With the Key monad, we extend this simple naming approach to typed representations without adding |Typeable| constraints. Consider the following data type:
 \begin{code}
 data KExp s a where
   KVar  ::  Key s a -> KExp s a
@@ -796,8 +796,8 @@ instance FFunctor (TList l) where
   ffmap f TNil      = TNil
   ffmap f (h ::: t) = f h ::: ffmap f t
 \end{code}
-\label{ccc}
 \caption{Translating lambda terms to Cartesian closed categories.}
+\label{ccc}
 %$
 \end{figure}
 
@@ -809,7 +809,7 @@ In this section, we state more precisely what we mean by safety, and informally 
 
 \subsection{Type safety}
 
-The first safety property that we conjecture the Key monad has is \emph{type safety}: |testEquality| will never allow us to prove that |a :~: b| if |a| and |b| are \emph{distinct} types. Informally, the justification for this is that a key value |k| of type |Key s a| together with the type |s|, which we call the \emph{scope type variable},  \emph{uniquely determine} the associated type |a| of the key. Hence, when two key values and scope type variables are the same\footnote{Even though users cannot compare keys explicitly, implementations of the Key monad internally represent keys by some underlying value that can be compared for equality.}, their associated types \emph{must be the same} as well. 
+The first safety property that we conjecture the Key monad has is \emph{type safety}: |testEquality| will never allow us to prove that |a :~: b| if |a| and |b| are \emph{distinct} types. Informally, the justification for this is that a key value |k| of type |Key s a| together with the type |s|, which we call the \emph{scope type variable},  \emph{uniquely determines} the associated type |a| of the key. Hence, when two key values and scope type variables are the same\footnote{Even though users cannot compare keys explicitly, implementations of the Key monad internally represent keys by some underlying value that can be compared for equality.}, their associated types \emph{must be the same} as well. 
 
 The argument why the scope type variable |s| and the key value |k| together uniquely determine type |a| goes as follows:
 \begin{enumerate}
@@ -829,7 +829,7 @@ The second safety property that we are concerned with is \emph{referential trans
 \end{code}
 
 In other words, referential transparency means that an expression always evaluates to the same result in any context. Our implementation of the key monad only relies on \emph{unsafeCoerce}; it does not use \emph{unsafePerformIO}, nor does it use |unsafeCoerce| to convert an |IO a| action to a pure value (if we assume type safety) and hence referential transparency cannot be broken by this implementation. Since the \st{} monad can be implemented using the Key monad, the same can be said for the \st{} monad. 
-However, more efficient implementations of the \st{} monad uses \emph{global} pointers respectively, which does rely on features that might potentially break referential transparency.
+However, more efficient implementations of the \st{} monad use \emph{global} pointers respectively, which do rely on features that might potentially break referential transparency.
 
 
 \subsection{Abstraction safety} 
@@ -929,7 +929,7 @@ The question of whether or not the Key monad is implementable in Haskell (with e
 
 \subsection{Implementation using |unsafeCoerce|}
 
-To get a feel for possible implementations of the Key monad, let us first consider a straightforward implementation, using \emph{unsafeCoerce}, in which we give each key a unique name. One could implement generating unique names using a state monad, but the |(purity)| key monad law (|m >> n == n)| would then not hold. Instead, we implement the Key monad using an splittable name supply, with the following interface:
+To get a feel for possible implementations of the Key monad, let us first consider a straightforward implementation, using \emph{unsafeCoerce}, in which we give each key a unique name. One could implement generating unique names using a state monad, but the |(purity)| key monad law (|m >> n == n)| would then not hold. Instead, we implement the Key monad using a splittable name supply, with the following interface:
 \begin{code}
 newNameSupply  :: NameSupply
 split          ::  NameSupply -> 
@@ -987,7 +987,7 @@ A downside of this implementation is that |testEquality| is linear in the length
 
 Can we formalize through types the invariant that when two keys are the same their types must also be the same? It turns out we can, but this adds more types to the interface, leading to a loss of power of the construction.
 
-The crucial insight is that is needed for this implementation, is that it \emph{is} possible to implement to compare two indices in a heterogeneous list (Fig \ref{heteros}), and if they are equal, then produce a that the proof types are equal, as follows:
+The crucial insight is that is needed for this implementation, is that it \emph{is} possible to implement to compare two indices in a heterogeneous list (Fig \ref{heteros}), and if they are equal, then produce a proof that the types are equal, as follows:
 \begin{code}
 testEquality :: Index l a -> Index l b -> Maybe (a :~: b)
 testEquality Head      Head      = Just Refl
@@ -1092,13 +1092,13 @@ runKeyM :: (exists p. forall s. KeyIM s p a) -> a
 \end{code}
 These types are \emph{not} equivalent: the latter implies the former, but not the other way around. In the former, the type which is bound to |p| may depend on |s|, which cannot happen in the latter. 
 
-Let us take a look at what happens if we allow this coercion and |p| does depend on |s|, for example when we create a key of type |Key s (Key s Int)|. When the type |s| is now unified with the tree of types of the keys, it leads a \emph{cyclic} type:
+Let us take a look at what happens if we allow this coercion and |p| does depend on |s|, for example when we create a key of type |Key s (Key s Int)|. When the type |s| is now unified with the tree of types of the keys, it leads to a \emph{cyclic} type:
 \begin{code}
 s ~ (Key s Int) :++: t
 \end{code} 
 In the previous section, we demonstrated that allowing such keys, where the type of the key mentions |s|, allows us to write |fix| without recursion. In the worst case, allowing such cyclic types may lead to type unsoundness.
 
-For |join| other problems arise. We need a implementation of type:
+For |join| other problems arise. We need an implementation of type:
 \begin{code}
 join ::  (exists p. KeyIM s p (exists q. KeyIM s q a)) -> 
          exists r. KeyIM s r a
