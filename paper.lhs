@@ -1127,7 +1127,7 @@ Now, we actually believe that the \st{} monad (and also the Key monad) is safe i
 In the \st{} monad, one of the invariants that must hold is that when two references are the same, then their types must also be the same. We presented the Key monad, which splits reasoning based on this invariant into a separate interface, and makes it available to the user. We showed that this new interface gives a form of dynamic typing without the need for |Typeable| constraints, which allows us to do things we could not do before: it allows us to implement heterogeneous maps, to implement the \st{} monad, to implement an embedded form of arrow syntax and to translate parametric \hoas{} to typed de Bruijn indices. The Key monad is simpler than the \st{} monad, since the former embodies just one aspect of the latter. A full proof of the safety of the \st{} monad remains elusive to this day. We feel that the Key monad might be the key to the proof of the \st{} monad. 
 
 \paragraph{Acknowledgements}
-We thank Gershom Bazerman, Jonas Dure\-g{\aa}rd and John Hughes for helpful comments and insightful discussions.
+We thank Gershom Bazerman, Jonas Dure\-g{\aa}rd and John Hughes for helpful comments and insightful discussions. This work was supported in part by The Sloan Foundation.
 \label{conc}
 \bibliographystyle{apalike}
 \bibliography{refs}
