@@ -215,13 +215,13 @@ consistent.
     key monad, given that the key monad is expressive enough to
     implement higher-order state and higher-order state is well known
     to be sufficient for expressing a fix point combinator.
-* TODO
+* DONE
 
 6.1:
   - "an splittable"
   - perhaps add a citation for splittable name supplies (maybe McBride
     and McKinna's Haskell 2004 pearl)
-* TODO
+* DONE
 
 6.2:
   - "then produce a that the proof types" should be "then produce a

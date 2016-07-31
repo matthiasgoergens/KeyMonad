@@ -935,7 +935,7 @@ The question of whether or not the Key monad is implementable in Haskell (with e
 
 \subsection{Implementation Using |unsafeCoerce|}
 
-To get a feel for possible implementations of the Key monad, let us first consider a straightforward implementation, using \emph{unsafeCoerce}, in which we give each key a unique name. One could implement generating unique names using a state monad, but the |(purity)| key monad law (|m >> n == n)| would then not hold. Instead, we implement the Key monad using a splittable name supply, with the following interface:
+To get a feel for possible implementations of the Key monad, let us first consider a straightforward implementation, using \emph{unsafeCoerce}, in which we give each key a unique name. One could implement generating unique names using a state monad, but the |(purity)| key monad law (|m >> n == n)| would then not hold. Instead, we implement the Key monad using a splittable name supply~\cite{McBride2004}, with the following interface:
 \begin{code}
 newNameSupply  :: NameSupply
 split          ::  NameSupply -> 
