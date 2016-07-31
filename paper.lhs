@@ -658,7 +658,7 @@ Note that we only need the Key monad to {\em create} keys. Once we have created 
 
 The datatype |KExp| does not ensure that any value of type |KExp| is well-scoped. There are two well-known approaches to constructing data types for syntax which ensure that every value is well-scoped.  The first is parametric Higher Order Abstract Syntax (\hoas{}) \cite{phoas, ags, graphs}, and the second is using typed de Bruijn indices \cite{nested}.
 
-Interestingly, there seems to be no type-safe way to translate parametric \hoas{} terms to terms with typed de Bruijn indices (without adding |Typeable| constraints to the |Phoas| datatype or using |unsafeCoerce|). The Key monad does allow us to cross this chasm.
+Previous work~\citep{Atkey2009syntaxff, Atkey09unembedding} has shown how to translate parametric \hoas{} terms to terms with typed de Bruijn indices by relying on parametricty. Interestingly, it seems there is no type-safe way to do this in Haskell without adding |Typeable| constraints to the |Phoas| datatype or using |unsafeCoerce|. The Key monad does allow us to cross this chasm.
 
 In parametric \hoas{}, typed lambda terms are represented by the following data type:
 \begin{code}
