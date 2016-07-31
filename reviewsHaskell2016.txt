@@ -198,7 +198,7 @@ Minor comments and typos:
 4.2:
   - "Figure 4.2". Something seems to have gone wrong with references to
     figures here and elsewhere in the paper.
-* TODO!
+* DONE
 
 5.1: "uniquely determine the" should be "uniquely determines the"
 *DONE

@@ -105,7 +105,7 @@ data a :~: b where Refl :: a :~: a
 \end{figure}
 
 In this paper, we provide a new abstraction in Haskell (+ \gadt s and rank-2 types) that
-embodies only feature (3) above: the combination of references (which we call {\em keys}) of different, unconstrained types in the same computation. In the \st{} monad, the essential invariant that must hold for feature (3), is that when two references are the same, then their types \emph{must also be the same}. Our new abstraction splits reasoning based on this invariant into a separate interface, and makes it available to the user. The result is a small library called {\em the Key monad}, of which the \api{} is given in Fig.\ \ref{fig:key-monad}. 
+embodies only feature (3) above: the combination of references (which we call {\em keys}) of different, unconstrained types in the same computation. In the \st{} monad, the essential invariant that must hold for feature (3), is that when two references are the same, then their types \emph{must also be the same}. Our new abstraction splits reasoning based on this invariant into a separate interface, and makes it available to the user. The result is a small library called {\em the Key monad}, of which the \api{} is given in Figure\ \ref{fig:key-monad}. 
 
 The Key monad |KeyM| is basically a crippled version of the \st{} monad: we can monadically create keys of type |Key s a| using the function |newKey|, but we cannot read or write values to these keys; in fact, keys do not carry any values at all. We can convert a computation in |KeyM| into a pure value by means of |runKeyM|, which requires the argument computation to be polymorphic in |s|, just like |runST| would.
 
@@ -149,7 +149,7 @@ Our contributions are as follows:
 
 In this section, we describe the Key monad, what it gives us, and its relation to the \st{} monad.
 
-The interface of the Key monad (Fig.\ \ref{fig:key-monad}) features two abstract types (i.e., types with no user-accessible constructors): |Key| and |KeyM|. The Key monad gives the user the power to create a new, unique value of type |Key s a| via |newKey|. The only operation that is supported on the type |Key| is |testEquality|, which checks if two given keys are the same, and if they are returns a ``proof'' that the types associated with the names are the same types. 
+The interface of the Key monad (Figure\ \ref{fig:key-monad}) features two abstract types (i.e., types with no user-accessible constructors): |Key| and |KeyM|. The Key monad gives the user the power to create a new, unique value of type |Key s a| via |newKey|. The only operation that is supported on the type |Key| is |testEquality|, which checks if two given keys are the same, and if they are returns a ``proof'' that the types associated with the names are the same types. 
 
 \subsection{Unconstrained Dynamic Typing}
 
@@ -291,7 +291,7 @@ In fact, all example usages of the Key monad in this paper can also be implement
 
 \subsection{Key Monad Laws}
 \label{seclaws}
-Informally, the Key monad allows us to create new keys and compare them, maybe obtaining a proof of the equality of their associated types. To give a more precise specification and to allow equational reasoning, we also present the Key monad laws shown in Figure \ref{laws}, which we will now briefly discuss. 
+Informally, the Key monad allows us to create new keys and compare them, maybe obtaining a proof of the equality of their associated types. To give a more precise specification and to allow equational reasoning, we also present the Key monad laws shown in Figure~\ref{laws}, which we will now briefly discuss. 
 
 \begin{figure}
 \hspace{-0.7cm}
@@ -375,7 +375,7 @@ In this section, we show that the Key monad gives us the power to implement an \
 
 \subsection{Arrows vs Monads}
 
-The |Arrow| type class, shown in Fig.\ \ref{arrowsdef}, was introduced by Hughes \cite{arrows} as an interface that is like monads, but which allows for more static information about the constructed computations to be extracted. However, in contrast to monads, arrows do not directly allow intermediate values to be \emph{named}; instead, expressions must be written in \emph{point-free style}. 
+The |Arrow| type class, shown in Figure\ \ref{arrowsdef}, was introduced by Hughes \cite{arrows} as an interface that is like monads, but which allows for more static information about the constructed computations to be extracted. However, in contrast to monads, arrows do not directly allow intermediate values to be \emph{named}; instead, expressions must be written in \emph{point-free style}. 
 
 As an example, an arrow computation which feeds the same input to two arrows, and adds their outputs, can be expressed in point-free style as follows:
 \begin{code}
@@ -600,7 +600,7 @@ toRelativeM (Unpure m f)  = m .>>= (toRelativeM :. f)
 \end{code}
 The insight is that because a computation must eventually return a value of |v a| to convert a relative monad computation via |toRelativeM|, any pure value that is used, can eventually be removed via the monad law |return x >>= f == f x|. Our embedded arrow construction can be seen as a relative monad, where we apply this trick to obtain a monadic interface.
 
-Our construction hence suggests that arrows are also a special case of relative monad in Haskell with the key monad, but a formal proof (using the Key monad laws from Figure (\ref{laws})) is outside the scope of this paper. In the code online, we also show that this construction can be extended to use \emph{relative monadfix} (with function  |rmfix :: (v a -> m a) -> m a|) to construct arrows using |ArrowLoop|, but we cannot use recursive monad notation in this case, because the above trick does not extend to Monadfix.
+Our construction hence suggests that arrows are also a special case of relative monad in Haskell with the key monad, but a formal proof (using the Key monad laws from Figure \ref{laws}) is outside the scope of this paper. In the code online, we also show that this construction can be extended to use \emph{relative monadfix} (with function  |rmfix :: (v a -> m a) -> m a|) to construct arrows using |ArrowLoop|, but we cannot use recursive monad notation in this case, because the above trick does not extend to Monadfix.
 
 
 The \emph{Arrow Calculus}\cite{arrowcalc} describes a translation of a form of arrow syntax (not embedded in Haskell) to arrows which is very similar to the construction presented here. Their calculus has five laws, three of which can be considered to be relative monad laws, which they use to prove the equational correspondence between their calculus and regular arrows. Due to the similarity, their paper should provide a good starting point for anyone trying to prove the same for this construction.
@@ -675,7 +675,7 @@ phoasExample = PLam (\x -> PLam (\y -> x))
 \end{code}
 An attractive property of parametric \hoas{} is that we use Haskell binding to construct syntax, and that terms of type |(forall v. Phoas v a)| are always well-scoped \cite{phoas}.
 
-The second way to ensure well-scopedness is to use typed de Bruijn indices. Here, we present our own modern variant of this technique using Data Kinds and \gadt s, but the idea is essentially the same as presented by Bird and Paterson \cite{nested}. Our representation of typed de Bruijn indices is an index in a heterogeneous list (Fig.\ \ref{heteros}). A typed de Bruijn index of type |Index l a| is an index for a variable of type |a| in an environment where the types of the variables are represented by the type level list |l|. We can use these indices to represent lambda terms as follows:
+The second way to ensure well-scopedness is to use typed de Bruijn indices. Here, we present our own modern variant of this technique using Data Kinds and \gadt s, but the idea is essentially the same as presented by Bird and Paterson \cite{nested}. Our representation of typed de Bruijn indices is an index in a heterogeneous list (Figure\ \ref{heteros}). A typed de Bruijn index of type |Index l a| is an index for a variable of type |a| in an environment where the types of the variables are represented by the type level list |l|. We can use these indices to represent lambda terms as follows:
 \begin{code}
 data Bruijn l a where
   BVar  :: Index l a -> Bruijn l a
@@ -919,7 +919,7 @@ fix f = runKeyM $
 \label{fig:fix}
 \end{figure}
 %$
-Fig.\ \ref{fig:fix} presents the implementation of |fix|. First, we introduce a datatype |D s a| for domains representing models of the untyped lambda calculus. (We are going to encode the standard fixpoint combinator |\f -> (\x -> f (x x)) (\x -> f (x x))| in this domain.) An element of |D s a| is either a function over |D s a| or a value of type |a|. Normally, we would use contravariant recursion for the argument of |Fun|, but we are not allowed to, so we mask it by using a |Box s| instead. As a result, |D s a| is not contravariantly recursive, and neither are any of its instances.
+Figure\ \ref{fig:fix} presents the implementation of |fix|. First, we introduce a datatype |D s a| for domains representing models of the untyped lambda calculus. (We are going to encode the standard fixpoint combinator |\f -> (\x -> f (x x)) (\x -> f (x x))| in this domain.) An element of |D s a| is either a function over |D s a| or a value of type |a|. Normally, we would use contravariant recursion for the argument of |Fun|, but we are not allowed to, so we mask it by using a |Box s| instead. As a result, |D s a| is not contravariantly recursive, and neither are any of its instances.
 
 Second, we introduce two helper functions: |lam|, which takes a function over the domain, and injects it as an element into the domain, and |app|, which takes two elements of the domain and applies the first argument to the second argument. Both need an extra argument of type |Key s (D s a)| to lock/unlock the forbidden recursive argument.
 
