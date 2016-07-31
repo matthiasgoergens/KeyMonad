@@ -81,7 +81,7 @@
 \category{D.3.3}{Programming Languages}{Language Constructs and Features}
 
 \keywords
-Functional programming, Haskell, Higher-order state, ST monad
+Functional programming, Haskell, Higher-order state, ST monad, Arrow notation, Parametric HOAS
 
 \section{Introduction}
 
