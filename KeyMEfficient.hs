@@ -19,7 +19,7 @@ instance TestEquality (Key s) where
     | otherwise  = Nothing
 
 newKey :: KeyM s (Key s a)
-newKey = KeyM $ \r -> unsafePerformIO $ 
+newKey = KeyM $ \r -> unsafePerformIO $
   do n <- readIORef r
      writeIORef r (n + 1)
      return (Key n)

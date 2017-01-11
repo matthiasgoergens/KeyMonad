@@ -5,7 +5,7 @@ import KeyM
 import Control.Monad
 import Prelude hiding (lookup,(!))
 import Data.Maybe
-import PFunctor 
+import PFunctor
 
 data FBox s f where
   FLock :: Key s a -> f a -> FBox s f
@@ -28,11 +28,11 @@ singleton :: Key s a -> f a -> FKeyMap s f
 singleton k v = insert k v empty
 
 insert :: Key s a -> f a -> FKeyMap s f  -> FKeyMap s f
-insert k v (FKm l) = FKm (FLock k v : l)	
+insert k v (FKm l) = FKm (FLock k v : l)
 
 lookup :: Key s a -> FKeyMap s f -> Maybe (f a)
 lookup k (FKm [])       = Nothing
-lookup k (FKm (h : t))  = 
+lookup k (FKm (h : t))  =
   funlock k h `mplus` lookup k (FKm t)
 
 (!) :: FKeyMap s f -> Key s a -> f a

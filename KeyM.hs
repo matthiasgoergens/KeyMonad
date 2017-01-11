@@ -26,7 +26,7 @@ instance TestEquality (Key s) where
     | otherwise  = Nothing
 
 
-data KeyM s a = KeyM { getKeyM :: NameSupply -> a } 
+data KeyM s a = KeyM { getKeyM :: NameSupply -> a }
 data Key s a = Key Name
 
 

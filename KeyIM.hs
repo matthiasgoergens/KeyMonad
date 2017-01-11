@@ -3,7 +3,7 @@ import HList
 import Data.Type.Equality
 import Control.Applicative
 import Control.Monad
-  
+
 
 data Tree a = Leaf a | (Tree a) :++: (Tree a)
 
@@ -16,7 +16,7 @@ testEq :: forall a b w. a `Sub` w -> b `Sub` w -> Maybe (a :~: b)
 testEq Start           Start = Just Refl
 testEq (LeftChild l)   (LeftChild r)  = weakenL <$> testEq l r
 testEq (RightChild l)  (RightChild r) = weakenR <$> testEq l r
-testEq _               _              = Nothing  
+testEq _               _              = Nothing
 weakenL :: ((l :++: r) :~: (l' :++: r')) -> l :~: l'
 weakenL x = case x of Refl -> Refl
 
@@ -40,11 +40,11 @@ supplyTName = id
 data Key s a = Key (Sub (Leaf a) s)
 
 instance TestEquality (Key s) where
-  testEquality (Key l) (Key r) = 
+  testEquality (Key l) (Key r) =
      case testEq l r of
       Just Refl -> Just Refl
       Nothing   -> Nothing
-                                   
+
 
 data KeyIm p s a = KeyIm { getKeyIm :: TNameSupply p s -> a }
 
@@ -80,7 +80,7 @@ instance Applicative (KeyM s) where pure = return; (<*>) = ap
 
 instance Monad (KeyM s) where
   return = KeyM . ireturn
-  m >>= f = 
+  m >>= f =
    case m of
     KeyM m' -> KeyM $ m' .>>= \x ->
            case f x of
