@@ -15,8 +15,9 @@ cabal-version:       >=1.10
 
 library
   hs-source-dirs:      src
-  exposed-modules:     Arrow
-                     , FKeyMap
+  exposed-modules:     FKeyMap
+                  -- TODO: reenable after fixing instance problems.
+                  -- , Arrow
                      , Fix
                      , HList
                      , KeyAtkey
@@ -27,8 +28,9 @@ library
                      , Lib
                      , PFunctor
                      , ST
-                     , SyntaxTranslate
-                     , ToCCC
+                     -- TODO: reenable once we have KExp module.
+                     -- , SyntaxTranslate
+                     -- , ToCCC
   build-depends:       base >= 4.7 && < 5
                      , mtl >= 2.2.1
   default-language:    Haskell2010
