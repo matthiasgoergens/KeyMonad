@@ -16,7 +16,7 @@ data TTreePath (p :: Tree *) (w :: Tree *) where
 samePath ::  TTreePath p w -> TTreePath p' w
              -> Maybe (p :~: p')
 -- fix this type error
-samePath Start      Start      = Just Refl
+samePath Start      Start      = Just (unsafeCoerce Refl)
 samePath (Left l)   (Left r)   = weakL  <$> samePath l r
 samePath (Right l)  (Right r)  = weakR  <$> samePath l r
 samePath _          _          = Nothing
