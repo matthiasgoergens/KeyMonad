@@ -1,4 +1,5 @@
 {-# LANGUAGE GADTs, AllowAmbiguousTypes, RankNTypes, DataKinds, TypeOperators, PolyKinds, TypeFamilies, UndecidableInstances #-}
+module KeyIM where
 import HList
 import Data.Type.Equality
 import Control.Applicative

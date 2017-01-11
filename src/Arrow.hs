@@ -1,5 +1,6 @@
-
 {-# LANGUAGE Rank2Types, FunctionalDependencies, TypeOperators, GADTs,DataKinds, DeriveFunctor,FlexibleInstances, GeneralizedNewtypeDeriving, MultiParamTypeClasses #-}
+module Arrow where
+
 import Control.Arrow
 import qualified Control.Category as Cat
 import KeyM

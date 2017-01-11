@@ -1,4 +1,5 @@
 {-# LANGUAGE GADTs, RankNTypes, DataKinds, TypeOperators, PolyKinds, TypeFamilies, UndecidableInstances #-}
+module ToCCC where
 import SyntaxTranslate
 import Control.Category
 import HList

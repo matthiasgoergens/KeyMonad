@@ -30,6 +30,7 @@ library
                      , SyntaxTranslate
                      , ToCCC
   build-depends:       base >= 4.7 && < 5
+                     , mtl >= 2.2.1
   default-language:    Haskell2010
 
 test-suite KeyMonad-test
