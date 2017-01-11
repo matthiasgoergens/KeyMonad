@@ -41,10 +41,10 @@ withEnv :: Arrow a =>  Cage s x ->
 withEnv c = dup >>> first (elimEnv c)
     where dup = arr (\x -> (x,x))
 
-toEnvArrow ::  Arrow a =>  
-           Cage s x  -> Key s y   -> 
+toEnvArrow ::  Arrow a =>
+           Cage s x  -> Key s y   ->
            a x y -> EnvArrow a s
-toEnvArrow inC outK a  = EnvArrow $ 
+toEnvArrow inC outK a  = EnvArrow $
    withEnv inC >>> first a >>> extendEnv outK
 
 (-<) :: Arrow a =>
@@ -82,7 +82,7 @@ afix f = AS $
      (outC, EnvArrow a) <- lift $ runWriterT m
      tell (EnvArrow $ loop (makeLoopable k outC a))
      return (toCage k)
-   
+
 
 
 -- relative monads
@@ -100,11 +100,11 @@ instance (Functor m, Applicative m, Monad m) => RelativeMonad (IdF m) Id where
   rreturn (Id x) = IdF $ return x
   (IdF m) .>>= f = IdF $ Id <$> m >>= getIdf . f
 
--- every relative monad is a monad via the following trick: (Svenningsson and Svensson), who did not 
+-- every relative monad is a monad via the following trick: (Svenningsson and Svensson), who did not
 -- formulate it as such
 data RelativeMSyntax rm v a where
    Pure :: a -> RelativeMSyntax rm v a
-   Unpure ::  rm a -> (v a -> RelativeMSyntax rm v b) 
+   Unpure ::  rm a -> (v a -> RelativeMSyntax rm v b)
               -> RelativeMSyntax rm v b
 
 instance Monad (RelativeMSyntax rm v) where
@@ -112,7 +112,7 @@ instance Monad (RelativeMSyntax rm v) where
   (Pure x) >>= f = f x
   (Unpure m f) >>= g = Unpure m (\x -> f x >>= g)
 
-fromRelativeM :: RelativeMonad rm v => 
+fromRelativeM :: RelativeMonad rm v =>
    rm a -> RelativeMSyntax rm v (v a)
 fromRelativeM m = Unpure m return
 
@@ -120,7 +120,7 @@ toRelativeM :: RelativeMonad rm v =>
                   RelativeMSyntax rm v (v a) -> rm a
 toRelativeM (Pure x)      = rreturn x
 toRelativeM (Unpure m f)  = m .>>= (toRelativeM . f)
- 
+
 
 -- not really a monad, but up to observation
 
@@ -177,7 +177,7 @@ instance (Applicative v, RelativeMonad m v) => Arrow (RelKleisli m v) where
 
 instance (Applicative v, RelativeMonad m v, RelativeMonadFix m v) => ArrowLoop (RelKleisli m v) where
    loop (RelKleisli f) = RelKleisli $ makeLoop f
-        
+
 
 makeLoop :: (Applicative v, RelativeMonadFix m v) => (v (x,z) -> m (y,z)) -> v x -> m y
 makeLoop f x = liftRm fst (rmfix (\y -> f $ (,) <$> x <*> (snd <$> y)))
